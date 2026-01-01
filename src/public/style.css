@@ -42,3 +42,101 @@ body {
 .title { font-weight: bold; color: #58a6ff; }
 .status { font-size: 0.8rem; color: #7ee787; }
 #terminal { flex: 1; padding: 10px; background: #0d1117; }
+
+/* --- LOGIN PAGE STYLES --- */
+.login-body {
+    background-color: #0d1117;
+    color: #a9b1d6;
+    font-family: 'HackNerdFont', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.login-container {
+    width: 400px;
+    border: 2px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-header {
+    background: #30363d;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #c9d1d9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    background-color: #ff5555; /* Red for locked */
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.login-content {
+    padding: 30px;
+    text-align: center;
+}
+
+.ascii-art {
+    white-space: pre;
+    color: #7aa2f7; /* Blue */
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.system-msg {
+    margin: 5px 0;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.input-wrapper {
+    margin-top: 25px;
+    background: #000;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: left;
+    position: relative;
+    border: 1px solid #30363d;
+}
+
+.prompt {
+    color: #73daca; /* Green */
+    margin-right: 10px;
+}
+
+#realPinInput {
+    position: absolute;
+    opacity: 0; /* Hide the real input but keep focus */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: text;
+}
+
+.cursor {
+    color: #7aa2f7;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.feedback {
+    margin-top: 15px;
+    height: 20px;
+    color: #ff5555;
+    font-size: 13px;
+}

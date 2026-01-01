@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restricted Access</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
+</head>
+<body class="login-body">
+    
+    <div class="login-container">
+        <div class="terminal-header">
+            <span class="status-dot"></span> SECURITY CHECK
+        </div>
+        
+        <div class="login-content">
+            <div class="ascii-art">
+   _  _  _  _____ 
+  | || || |/ /_ _|
+  | __ || ' < | | 
+  |_||_||_|\_\___|
+            </div>
+            
+            <p class="system-msg">WIRED_ALTER_TERM // v1.0</p>
+            <p class="system-msg">> IDENTITY VERIFICATION REQUIRED</p>
+            
+            <form id="pinForm" class="pin-form">
+                <div class="input-wrapper">
+                    <span class="prompt">root@gatekeeper:~$ enter_pin:</span>
+                    <input type="password" id="realPinInput" maxlength="6" autocomplete="off" autofocus>
+                    <span id="fakeCursor" class="cursor">█</span>
+                </div>
+                <div id="feedbackMsg" class="feedback"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>

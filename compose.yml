@@ -1,7 +1,7 @@
 services:
   wiredalter-term:
-#    build: .
-    image: ghcr.io/buildplan/wiredalter-term:latest
+    build: .
+#    image: ghcr.io/buildplan/wiredalter-term:latest
     container_name: wairedalter-term
     ports:
       - "127.0.0.1:3939:3939"
@@ -10,4 +10,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NODE_ENV=production
+      - PIN=324252             # <--- Change this
+      - SESSION_SECRET=sup3r_s3cr3t_k3y_chang3_m3 # <--- Change this
     restart: unless-stopped
