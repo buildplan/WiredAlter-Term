@@ -18,25 +18,40 @@ const io = new Server(httpServer);
 
 const PORT = process.env.PORT || 3939;
 const PIN = process.env.PIN || "123456";
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
 process.env.STARSHIP_CONFIG = join(process.env.HOME, '.config', 'starship.toml');
 
 // --- 0. PRE-FLIGHT CHECKS ---
-// Ensure /data/sessions exists before Session Middleware starts
 if (!fs.existsSync('/data/sessions')) {
     fs.mkdirSync('/data/sessions', { recursive: true });
 }
 
 // --- 1. SECURITY MIDDLEWARE SETUP ---
 
+// Required for secure cookies behind Cloudflare/Nginx
 app.set('trust proxy', 1);
 
+// Strict Limiter for Login (Brute Force Protection)
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts
     message: { error: "⛔ SYSTEM LOCKDOWN: Too many failed attempts. Retry in 15m." },
     standardHeaders: true,
     legacyHeaders: false,
 });
+
+// General Limiter for Assets (DoS Protection)
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300, // 300 requests per 15m
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: "Too many requests. Please slow down."
+});
+
+// Apply general limiter globally to all routes
+app.use(generalLimiter);
 
 app.use(session({
     store: new FileStore({
@@ -48,8 +63,9 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false,
+        secure: IS_PRODUCTION,
         httpOnly: true,
+        sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
@@ -63,6 +79,7 @@ app.get('/login', (req, res) => {
     res.sendFile(join(__dirname, 'public/login.html'));
 });
 
+// Use the stricter loginLimiter specifically for verification
 app.post('/verify-pin', loginLimiter, (req, res) => {
     const { pin } = req.body;
     if (pin === PIN) {
@@ -82,7 +99,6 @@ app.get('/logout', (req, res) => {
 
 // Auth Guard Middleware
 const requireAuth = (req, res, next) => {
-    // Whitelist static files for login page
     const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico'];
     if (publicAllowlist.includes(req.path)) return next();
 
@@ -104,7 +120,7 @@ app.use((req, res, next) => {
 
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// Serve Font from the SYMLINKED public folder
+// Serve Font
 app.get('/fonts/font.ttf', (req, res) => {
     const fontPath = join(__dirname, 'public/fonts/font.ttf');
     if (!fs.existsSync(fontPath)) return res.status(404).send('Font not found');
@@ -174,7 +190,6 @@ const setupPersistence = () => {
     seedAndLink('.config/starship.toml', false, join(seedDir, 'config/starship.toml'));
     seedAndLink('storage', true);
 
-    // Ensure the session folder exists in /data so FileStore doesn't crash
     if (!fs.existsSync('/data/sessions')) {
         fs.mkdirSync('/data/sessions', { recursive: true });
         console.log('   🌱 Created persistent session directory');
