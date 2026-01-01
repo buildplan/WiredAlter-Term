@@ -1,72 +1,126 @@
-# WiredAlterTerm 💻
+# WiredAlterTerm
 
-A containerized, persistent, web-based terminal built on Node.js 24 and Debian Trixie. Features a custom Nerd Font, Starship prompt, and full Docker control from the browser.
+A robust, containerized, web-based terminal built on **Node.js 24** and **Debian 13 (Trixie)**.
 
-## 🚀 Features
+It provides a full-featured terminal environment in your browser with persistent configuration, a custom Nerd Font, Starship prompt, and secure Docker-in-Docker control. Designed to be portable across any Linux host without permission issues.
 
-* **Persistent Configuration:** SSH keys, Bash history, and Starship config survive restarts.
-* **Customizable Aesthetics:** "Hack" Nerd Font and Debian-themed prompt included by default.
-* **Docker-in-Docker:** Run `docker ps` and other commands directly from the web terminal.
-* **Portable:** Automatically fixes permissions (GID mapping) to work on any host OS.
-* **Self-Healing:** Automatically restores default configuration if files are deleted.
+## Key Features
 
-## 🛠️ Quick Start
+* **Persistent Identity:** SSH keys (`~/.ssh`), Bash history, and shell configuration (`~/.bashrc`) persist across container restarts.
+* **General Storage:** A dedicated `~/storage` directory for saving downloads, scripts, or project files persistently.
+* **Customizable Aesthetics:** Ships with "Hack" Nerd Font and a Debian-themed Starship prompt. Both are fully customizable via the host filesystem.
+* **Docker Control:** Run `docker ps`, `docker build`, and other commands directly from the browser (maps the host's Docker socket securely).
+* **Portable & Self-Healing:**
+    * **Auto-Permissions:** Automatically detects the host's Docker GID and maps it, preventing "Permission Denied" errors on any OS.
+    * **Factory Reset:** Automatically detects missing config files and restores defaults if they are deleted.
 
-1.  **Start the container:**
+---
 
-    ```bash
-    docker compose up -d --build
-    ```
-2.  **Access the terminal:**
-    Open `http://localhost:3939` (or your VPS IP).
+## Quick Start
 
-## ⚙️ Customization Guide
+### 1. Installation
+Clone the repository and start the container:
 
-All configuration lives in the local `data/` folder on your host machine.
+```bash
+git clone https://github.com/buildplan/WiredAlter-Term.git
+cd WiredAlter-Term
+docker compose up -d --build
+```
+
+### 2. Access
+
+Open your browser and navigate to:
+
+* **Local:** `http://localhost:3939`
+* **Remote:** `http://YOUR_VPS_IP:3939`
+
+---
+
+## Persistence & Storage Guide
+
+All persistent data lives in the local `./data/` folder on your host machine. The container symlinks internal paths to this folder.
+
+| Feature | Container Path | Host Path | Usage |
+| --- | --- | --- | --- |
+| **Storage** | `~/storage` | `./data/storage` | Save downloads/files here to keep them safe. |
+| **SSH Keys** | `~/.ssh/` | `./data/.ssh/` | Keys generated here persist forever. |
+| **Config** | `~/.config/` | `./data/.config/` | Starship configuration. |
+| **Shell** | `~/.bashrc` | `./data/.bashrc` | Custom aliases and environment vars. |
+| **Fonts** | *(Internal)* | `./data/fonts/` | The font file served to the browser. |
+
+### Using General Storage
+
+To save files (like source code, backups, or downloads) that survive container destruction, simply use the `storage` folder:
+
+```bash
+# Inside the web terminal
+cd ~/storage
+wget [https://example.com/project.zip](https://example.com/project.zip)
+```
+
+These files will instantly appear in `./data/storage` on your host.
+
+---
+
+## Customization
 
 ### 1. Change the Font
 
-To use a different font (e.g., FiraCode), simply replace the file in the data directory.
+The terminal uses a single `.ttf` file. To switch to FiraCode or JetBrains Mono:
 
-* **Location:** `./data/fonts/font.ttf`
-* **Action:** Overwrite this file with your desired `.ttf` (rename it to `font.ttf`).
-* **Apply:** Refresh your browser (Ctrl+F5).
+1. Download your desired Nerd Font `.ttf`.
+2. Rename it to `font.ttf`.
+3. Overwrite the existing file at `./data/fonts/font.ttf`.
+4. **Apply:** Hard refresh your browser (`Ctrl+F5` or `Cmd+Shift+R`).
 
 ### 2. Customize the Prompt
 
 The prompt is powered by [Starship](https://starship.rs).
 
-* **Location:** `./data/.config/starship.toml`
-* **Action:** Edit this file to change colors, symbols, or modules.
-* **Apply:** Run `docker compose restart` or reload the shell.
+1. Edit `./data/.config/starship.toml` on your host.
+2. **Apply:** Run `docker compose restart` or reload the shell.
 
-### 3. SSH Keys
+### 3. Add Custom Aliases
 
-Your keys are stored persistently.
+1. Edit `./data/.bashrc` on your host (or `nano ~/.bashrc` inside the terminal).
+2. Add your alias: `alias ll='ls -la'`.
+3. **Apply:** Run `source ~/.bashrc`.
 
-* **Location:** `./data/.ssh/`
-* **Usage:** Keys generated via `ssh-keygen` inside the web terminal are automatically saved here.
+---
 
-## 🆘 Troubleshooting
+## How It Works (Architecture)
 
-**"My prompt looks broken / I want to reset everything"**
+This project uses a **"Seed and Link"** strategy for robustness:
 
-If you mess up your configuration and want to go back to the factory defaults:
-1.  Stop the container: `docker compose down`
-2.  Delete the broken file from `./data` (e.g., `rm data/.config/starship.toml`).
-3.  Start the container: `docker compose up -d`
-4.  The system will detect the missing file and auto-generate the default one.
+1. **Entrypoint:** On startup, `src/entrypoint.sh` detects the host's Docker Group ID and dynamically adds the `node` user to that group.
+2. **Seeding:** `src/index.js` checks if `./data` contains your config files.
+   * If **No**: It copies the "Factory Defaults" (baked into the Docker image) to `./data`.
+   * If **Yes**: It respects your existing files.
+3. **Linking:** It forcefully removes the container's ephemeral config directories and creates symbolic links to `./data`.
 
-**"Docker permission denied"**
+---
 
-Ensure the container was started with access to the socket. The entrypoint script automatically detects the host's Docker Group ID and adds the `node` user to it. Check logs with:
+## Troubleshooting
+
+### "My prompt looks broken / I want to reset everything"
+
+If you break your configuration and want to return to the fresh install state:
+
+1. Stop the container: `docker compose down`
+2. Delete the problematic file from `./data` (e.g., `rm data/.config/starship.toml`).
+3. Start the container: `docker compose up -d`
+4. **Result:** The system detects the missing file and auto-generates the default one.
+
+### "Docker permission denied"
+
+Ensure the container has access to the socket. The system logs will tell you if the permission fix worked:
 
 ```bash
 docker compose logs -f
 ```
 
-If you want to verify the "Reset" capability one last time:
-1.  Run `rm data/.config/starship.toml` on your VPS.
-2.  Restart the container.
-3.  Watch the logs—you should see `🌱 Seeding default: .config/starship.toml` instead of `Found persistent file`.
+You should see: `🔌 Detected Host Docker GID: 989` (or similar).
 
+### "Changes disappear after restart"
+
+This should not happen. Ensure you are saving files into `~/storage` or one of the linked configuration files (`.bashrc`, `.ssh`). Files created in `~/` (root home) that are **not** symlinked will be lost on container recreation.
