@@ -1,0 +1,52 @@
+# Use Node.js 24 on Debian 13
+FROM node:24-trixie-slim
+
+# Install Dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dumb-init \
+    gosu \
+    python3 \
+    make \
+    g++ \
+    git \
+    openssh-client \
+    vim \
+    nano \
+    curl \
+    ca-certificates \
+    iputils-ping \
+    dnsutils \
+    fonts-powerline \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
+
+# Install Starship
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+WORKDIR /app
+COPY package.json .
+RUN npm install
+COPY . .
+
+# Setup Seed Directories & Download Font
+RUN mkdir -p /usr/local/share/smart-term/fonts \
+             /usr/local/share/smart-term/config && \
+    curl -L -o /usr/local/share/smart-term/fonts/font.ttf \
+    "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
+
+# onfigure Shell & Permissions
+RUN echo 'eval "$(starship init bash)"' >> /home/node/.bashrc && \
+    mkdir -p /data && \
+    chown -R node:node /app /data /home/node/.bashrc
+
+# Setup Entrypoint
+COPY src/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Metadata
+ENV HOME=/home/node
+EXPOSE 3939
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["node", "src/index.js"]

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Persistence Data
+data
+data/
+.ssh
+
+# Metadata
+.git
+.gitignore
+README*
+
+# Docker files
+Dockerfile
+*compose.yml
+.dockerignore
+
+# Environment variables
+.env*
+
+# OS generated files
+.DS_Store
+Thumbs.db

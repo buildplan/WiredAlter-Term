@@ -1,0 +1,12 @@
+services:
+  wiredalter-term:
+    build: .
+    container_name: wairedalter-term
+    ports:
+      - "127.0.0.1:3939:3939"
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped

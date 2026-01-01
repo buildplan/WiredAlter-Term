@@ -1,0 +1,44 @@
+@font-face {
+  font-family: 'TermFont';
+  src: url('/fonts/font.ttf?v=99') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+body {
+    margin: 0;
+    background-color: #0d1117;
+    color: #c9d1d9;
+    /* Force TermFont for everything */
+    font-family: 'TermFont', monospace; 
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    width: 95%;
+    height: 95%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    background: #21262d;
+    padding: 10px 15px;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+.title { font-weight: bold; color: #58a6ff; }
+.status { font-size: 0.8rem; color: #7ee787; }
+#terminal { flex: 1; padding: 10px; background: #0d1117; }
