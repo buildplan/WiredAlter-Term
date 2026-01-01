@@ -12,10 +12,11 @@ data/
 .gitignore
 README*
 
-# Docker files
+# Docker & GitHub files
 Dockerfile
 *compose.yml
 .dockerignore
+.github
 
 # Environment variables
 .env*
