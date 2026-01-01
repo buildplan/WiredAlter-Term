@@ -30,22 +30,98 @@ mkdir -p "$SEED_CONFIG_DIR"
 
 echo "🌱 Generating default Starship config..."
 cat <<EOF > "$SEED_CONFIG_DIR/starship.toml"
-"\$schema" = 'https://starship.rs/config-schema.json'
+"$schema" = 'https://starship.rs/config-schema.json'
+
 add_newline = true
+scan_timeout = 30
+command_timeout = 500
 
-[character]
-success_symbol = '[➜](bold green)'
-error_symbol = '[✗](bold red)'
+format = """
+[░▒▓](#7aa2f7)\
+[  ](bg:#7aa2f7 fg:#15161e)\
+[](fg:#7aa2f7 bg:#3b4261)\
+$hostname\
+$directory\
+[](fg:#3b4261 bg:#292e42)\
+$git_branch\
+$git_status\
+[](fg:#292e42 bg:#1f2335)\
+$cmd_duration\
+$nodejs\
+$rust\
+$golang\
+$php\
+$python\
+$docker_context\
+[](fg:#1f2335)\
+\n$character"""
 
-[os]
-disabled = false
-symbols.Debian = ' '
+[hostname]
+ssh_only = true
+ssh_symbol = "🌐 "
+style = "fg:#c0caf5 bg:#3b4261"
+format = "[ $ssh_symbol$hostname ]($style)"
 
-[docker_context]
-symbol = ' '
+[directory]
+style = "fg:#c0caf5 bg:#3b4261"
+format = "[ $path$read_only ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " "
+
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = " "
+"Pictures" = " "
+
+[git_branch]
+symbol = ""
+style = "fg:#7aa2f7 bg:#292e42"
+format = "[ $symbol $branch ]($style)"
+
+[git_status]
+style = "fg:#bb9af7 bg:#292e42"
+format = "[ $all_status$ahead_behind ]($style)"
+
+[cmd_duration]
+min_time = 2000
+style = "fg:#bb9af7 bg:#1f2335"
+format = "[ ⏱ $duration ]($style)"
 
 [nodejs]
-symbol = ' '
+symbol = ""
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol ($version) ]($style)"
+
+[rust]
+symbol = ""
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol ($version) ]($style)"
+
+[golang]
+symbol = ""
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol ($version) ]($style)"
+
+[php]
+symbol = ""
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol ($version) ]($style)"
+
+[python]
+symbol = "🐍"
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol ($version) ]($style)"
+
+[docker_context]
+symbol = " "
+style = "fg:#7aa2f7 bg:#1f2335"
+format = "[ $symbol $context ]($style)"
+
+[character]
+success_symbol = "[➜](bold #7aa2f7)"
+error_symbol = "[✗](bold #f7768e)"
 EOF
 
 # Ensure 'node' user can read these files
