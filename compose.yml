@@ -1,6 +1,7 @@
 services:
   wiredalter-term:
-    build: .
+#    build: .
+    image: ghcr.io/buildplan/wiredalter-term:latest
     container_name: wairedalter-term
     ports:
       - "127.0.0.1:3939:3939"
