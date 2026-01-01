@@ -13,12 +13,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \
     nano \
     curl \
+    wget \
+    unzip \
+    htop \
     ca-certificates \
     iputils-ping \
     dnsutils \
-    fonts-powerline \
     procps \
-    && rm -rf /var/lib/apt/lists/*
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
+    && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
+
+# Active Locale to UK
+ENV LANG en_GB.utf8
+ENV LANGUAGE en_GB:en
+ENV LC_ALL en_GB.utf8
 
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
 
