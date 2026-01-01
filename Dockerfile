@@ -1,5 +1,5 @@
-# Use Node.js 24 on Debian 13
-FROM node:24-trixie-slim
+# Use Node.js 25 on Debian 13
+FROM node:25-trixie-slim
 
 # Install Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
