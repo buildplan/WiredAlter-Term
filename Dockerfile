@@ -1,7 +1,7 @@
 # Use Node.js 25 on Debian 13
 FROM node:25-trixie-slim
 
-# Install ONLY Runtime Dependencies
+# Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init \
     gosu \
@@ -35,10 +35,11 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
 WORKDIR /app
 COPY package.json .
 
-# Install Compilers -> Build App -> Remove Compilers
+# Install Compilers -> Build -> Clean NPM -> Remove Compilers
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
     npm install && \
+    npm cache clean --force && \
     apt-get purge -y --auto-remove python3 make g++ && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
