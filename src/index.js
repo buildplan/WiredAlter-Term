@@ -217,5 +217,5 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
-    console.log(`🚀 SmartTerm running on http://localhost:${PORT}`);
+    console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
 });
