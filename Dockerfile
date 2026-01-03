@@ -27,9 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
 
 # Active Locale to UK
-ENV LANG en_GB.utf8
-ENV LANGUAGE en_GB:en
-ENV LC_ALL en_GB.utf8
+ENV LANG=en_GB.utf8
+ENV LANGUAGE=en_GB:en
+ENV LC_ALL=en_GB.utf8
 
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
 
