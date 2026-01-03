@@ -1,13 +1,10 @@
 # Use Node.js 25 on Debian 13
 FROM node:25-trixie-slim
 
-# Install Dependencies
+# Install Runtime Dependencies (Keep these)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init \
     gosu \
-    python3 \
-    make \
-    g++ \
     git \
     openssh-client \
     vim \
@@ -21,6 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsutils \
     procps \
     locales \
+    # Install Build Dependencies (Temp)
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/* \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
     && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
@@ -37,7 +38,13 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
 
 WORKDIR /app
 COPY package.json .
-RUN npm install
+
+# Install Node Modules AND Remove Build Tools
+RUN npm install && \
+    apt-get purge -y --auto-remove python3 make g++ && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 # Setup Seed Directories & Download Font
@@ -46,7 +53,7 @@ RUN mkdir -p /usr/local/share/smart-term/fonts \
     curl -L -o /usr/local/share/smart-term/fonts/font.ttf \
     "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
-# onfigure Shell & Permissions
+# Configure Shell & Permissions
 RUN echo 'eval "$(starship init bash)"' >> /home/node/.bashrc && \
     mkdir -p /data && \
     chown -R node:node /app /data /home/node/.bashrc
