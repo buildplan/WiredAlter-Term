@@ -88,10 +88,13 @@ body {
 }
 
 .ascii-art {
-    white-space: pre;
-    color: #7aa2f7; /* Blue */
+    white-space: pre; 
+    font-family: 'Courier New', monospace; 
+    text-align: center;
+    line-height: 1.2;
     font-weight: bold;
     margin-bottom: 20px;
+    display: inline-block;
 }
 
 .system-msg {
