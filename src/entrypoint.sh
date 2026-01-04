@@ -29,7 +29,7 @@ SEED_CONFIG_DIR="/usr/local/share/smart-term/config"
 mkdir -p "$SEED_CONFIG_DIR"
 
 echo "🌱 Generating default Starship config..."
-cat <<EOF > "$SEED_CONFIG_DIR/starship.toml"
+cat <<'SSHIP' > "$SEED_CONFIG_DIR/starship.toml"
 "$schema" = 'https://starship.rs/config-schema.json'
 
 add_newline = true
@@ -122,7 +122,46 @@ format = "[ $symbol $context ]($style)"
 [character]
 success_symbol = "[➜](bold #7aa2f7)"
 error_symbol = "[✗](bold #f7768e)"
-EOF
+SSHIP
+
+# Append to .bashrc
+echo "⚙️  Configuring shell environment..."
+cat <<'APPENDBASHRC' >> /home/node/.bashrc
+
+# --- Tools Init ---
+
+# Enable Bash Completion
+if [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+
+# Initialize Starship (Prompt)
+eval "$(starship init bash)"
+
+# Initialize Zoxide (Smarter cd)
+eval "$(zoxide init bash)"
+
+# Aliases
+alias ls='ls --color=auto'
+alias ll='ls -lah --color=auto'
+alias l='ls -CF'
+alias ..='cd ..'
+alias cp='cp -i'
+alias mv='mv -i'
+alias rm='rm -i'
+alias mkdir='mkdir -p'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
+# Bat (Better Cat) configuration
+export BAT_THEME="Dracula"
+
+# FZF (Fuzzy Finder) Keybindings
+if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+    source /usr/share/doc/fzf/examples/key-bindings.bash
+fi
+APPENDBASHRC
 
 # Ensure 'node' user can read these files
 chmod -R 755 /usr/local/share/smart-term
