@@ -37,12 +37,15 @@ COPY package.json .
 
 # Install Compilers -> Build -> Clean NPM -> Remove Compilers
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 make g++ && \
+    apt-get install -y --no-install-recommends \
+        python3 make g++ \
+        fzf zoxide bat bash-completion && \
     npm install && \
     npm cache clean --force && \
     apt-get purge -y --auto-remove python3 make g++ && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/batcat /usr/local/bin/bat
 
 COPY . .
 
@@ -53,9 +56,7 @@ RUN mkdir -p /usr/local/share/smart-term/fonts \
     "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
 # Configure Shell & Permissions
-RUN echo 'eval "$(starship init bash)"' >> /home/node/.bashrc && \
-    mkdir -p /data && \
-    chown -R node:node /app /data /home/node/.bashrc
+RUN mkdir -p /data && chown -R node:node /app /data /home/node/.bashrc
 
 # Setup Entrypoint
 COPY src/entrypoint.sh /usr/local/bin/
