@@ -93,8 +93,8 @@ body {
     text-align: center;
     line-height: 1.2;
     font-weight: bold;
-    margin-bottom: 20px;
-    display: inline-block;
+    margin: 0 auto 20px auto;
+    display: block;
 }
 
 .system-msg {
