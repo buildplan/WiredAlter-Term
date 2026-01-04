@@ -100,6 +100,14 @@ This project uses a **"Seed and Link"** strategy for robustness:
 
 ---
 
+## Screenshots
+
+<img width="2833" height="1602" alt="image" src="https://github.com/user-attachments/assets/fb113347-80b6-44b7-a853-e78cd1ed42a2" />
+
+<img width="2857" height="1603" alt="image" src="https://github.com/user-attachments/assets/d970f269-e5ff-4a9c-a343-a3844cbe2bb9" />
+
+---
+
 ## Troubleshooting
 
 ### "My prompt looks broken / I want to reset everything"
