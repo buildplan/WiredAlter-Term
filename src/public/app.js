@@ -1,5 +1,11 @@
-const socket = io();
+// Initialize Socket
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000
+});
 
+// Initialize Terminal
 const term = new Terminal({
     cursorBlink: true,
     fontFamily: "'TermFont', monospace",
@@ -18,6 +24,33 @@ const term = new Terminal({
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
+// --- UI Elements ---
+const statusElem = document.getElementById('connection-status');
+const logoutBtn = document.getElementById('logout-btn');
+
+// --- Socket Event Handlers ---
+socket.on('connect', () => {
+    statusElem.textContent = '🟢 Connected';
+    statusElem.style.color = '#7ee787';
+    statusElem.style.opacity = '1';
+});
+
+socket.on('disconnect', () => {
+    statusElem.textContent = '🔴 Disconnected';
+    statusElem.style.color = '#ff5555';
+    statusElem.style.opacity = '0.8';
+});
+
+socket.on('connect_error', () => {
+    statusElem.textContent = '⚠️ Connection Error';
+    statusElem.style.color = '#e0af68';
+});
+
+socket.on('terminal:output', data => {
+    term.write(data);
+});
+
+// --- App Initialization ---
 async function initializeApp() {
     console.log("⏳ Starting App...");
 
@@ -55,20 +88,24 @@ async function initializeApp() {
     socket.emit('terminal:resize', { cols: term.cols, rows: term.rows });
 }
 
-// Start the sequence
-initializeApp();
+// --- Interaction Handlers ---
 
-// --- Event Handlers ---
-
+// Resize
 window.addEventListener('resize', () => {
     fitAddon.fit();
     socket.emit('terminal:resize', { cols: term.cols, rows: term.rows });
 });
 
+// Input
 term.onData(data => {
     socket.emit('terminal:input', data);
 });
 
-socket.on('terminal:output', data => {
-    term.write(data);
+// Logout
+logoutBtn.addEventListener('click', () => {
+    logoutBtn.textContent = 'Logging out...';
+    window.location.href = '/logout';
 });
+
+// Start
+initializeApp();

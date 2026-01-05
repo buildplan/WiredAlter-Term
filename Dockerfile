@@ -3,21 +3,8 @@ FROM node:25-trixie-slim
 
 # Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    dumb-init \
-    gosu \
-    git \
-    openssh-client \
-    vim \
-    nano \
-    curl \
-    wget \
-    unzip \
-    htop \
-    ca-certificates \
-    iputils-ping \
-    dnsutils \
-    procps \
-    locales \
+    dumb-init gosu git openssh-client vim nano curl wget unzip \
+    htop ca-certificates iputils-ping dnsutils procps locales \
     && rm -rf /var/lib/apt/lists/* \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
     && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
@@ -39,7 +26,7 @@ COPY package.json .
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3 make g++ \
-        fzf zoxide bat bash-completion && \
+        fzf zoxide bat tmux bash-completion && \
     npm install && \
     npm cache clean --force && \
     apt-get purge -y --auto-remove python3 make g++ && \

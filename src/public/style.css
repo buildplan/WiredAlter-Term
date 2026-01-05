@@ -43,6 +43,26 @@ body {
 .status { font-size: 0.8rem; color: #7ee787; }
 #terminal { flex: 1; padding: 10px; background: #0d1117; }
 
+.logout-btn {
+    background-color: #21262d;
+    border: 1px solid #30363d;
+    color: #f7768e;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background-color: #30363d;
+    border-color: #8b949e;
+    color: #ff5555;
+}
+
+.logout-btn:active { transform: scale(0.98); }
+
 /* --- LOGIN PAGE STYLES --- */
 .login-body {
     background-color: #0d1117;
@@ -82,10 +102,7 @@ body {
     display: inline-block;
 }
 
-.login-content {
-    padding: 30px;
-    text-align: center;
-}
+.login-content { padding: 30px; text-align: center; }
 
 .ascii-art {
     white-space: pre; 
@@ -97,11 +114,7 @@ body {
     display: block;
 }
 
-.system-msg {
-    margin: 5px 0;
-    font-size: 14px;
-    opacity: 0.8;
-}
+.system-msg { margin: 5px 0; font-size: 14px; opacity: 0.8; }
 
 .input-wrapper {
     margin-top: 25px;
@@ -128,10 +141,7 @@ body {
     cursor: text;
 }
 
-.cursor {
-    color: #7aa2f7;
-    animation: blink 1s step-end infinite;
-}
+.cursor { color: #7aa2f7; animation: blink 1s step-end infinite; }
 
 @keyframes blink {
     50% { opacity: 0; }
