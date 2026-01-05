@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
 
 # Active Locale to UK
-ENV LANG=en_GB.utf8
-ENV LANGUAGE=en_GB:en
-ENV LC_ALL=en_GB.utf8
+ENV LANG=en_US.utf8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.utf8
 
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
 
@@ -24,11 +24,20 @@ COPY package.json .
 
 # Install Compilers -> Build -> Clean NPM -> Remove Compilers
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3 make g++ \
-        fzf zoxide bat tmux bash-completion && \
-    npm install && \
-    npm cache clean --force && \
+    apt-get install -y --no-install-recommends python3 make g++ \
+        fzf zoxide bat tmux bash-completion netcat-openbsd jq eza && \
+    npm install && npm cache clean --force && \
+    # Install asciinema
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-x86_64-unknown-linux-gnu"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-aarch64-unknown-linux-gnu"; \
+    else \
+        echo "❌ Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    curl -L -o /usr/local/bin/asciinema "$URL" && \
+    chmod +x /usr/local/bin/asciinema && \
     apt-get purge -y --auto-remove python3 make g++ && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
@@ -43,7 +52,7 @@ RUN mkdir -p /usr/local/share/smart-term/fonts \
     "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
 # Configure Shell & Permissions
-RUN mkdir -p /data && chown -R node:node /app /data /home/node/.bashrc
+RUN mkdir -p /data && chown -R node:node /app /data /home/node
 
 # Setup Entrypoint
 COPY src/entrypoint.sh /usr/local/bin/
