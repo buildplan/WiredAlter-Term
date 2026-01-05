@@ -30,19 +30,19 @@ const logoutBtn = document.getElementById('logout-btn');
 
 // --- Socket Event Handlers ---
 socket.on('connect', () => {
-    statusElem.textContent = '🟢 Connected';
+    statusElem.innerHTML = '<span class="status-icon">🟢</span> <span class="status-text">Connected</span>';
     statusElem.style.color = '#7ee787';
     statusElem.style.opacity = '1';
 });
 
 socket.on('disconnect', () => {
-    statusElem.textContent = '🔴 Disconnected';
+    statusElem.innerHTML = '<span class="status-icon">🔴</span> <span class="status-text">Disconnected</span>';
     statusElem.style.color = '#ff5555';
     statusElem.style.opacity = '0.8';
 });
 
 socket.on('connect_error', () => {
-    statusElem.textContent = '⚠️ Connection Error';
+    statusElem.innerHTML = '<span class="status-icon">⚠️</span> <span class="status-text">Error</span>';
     statusElem.style.color = '#e0af68';
 });
 

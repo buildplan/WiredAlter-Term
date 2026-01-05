@@ -15,12 +15,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <span id="connection-status" class="status">🟡 Connecting...</span>
-            
-            <span class="title">WiredTerm ~ Debian 13 ~ Node 25</span>
-            
+            <span id="connection-status" class="status">
+                <span class="status-icon">🟡</span> <span class="status-text">Connecting...</span>
+            </span>
+            <span class="title">
+                WiredTerm <span class="title-details">~ Debian 13 ~ Node 25</span>
+            </span>
             <button id="logout-btn" class="logout-btn">
-                Logout ⏻
+                <span class="btn-text">Logout</span> ⏻
             </button>
         </div>
         <div id="terminal"></div>
