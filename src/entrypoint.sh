@@ -127,40 +127,61 @@ SSHIP
 # Append to .bashrc
 echo "⚙️  Configuring shell environment..."
 cat <<'APPENDBASHRC' >> /home/node/.bashrc
-
 # --- Tools Init ---
 
-# Enable Bash Completion
+# Bash Completion
 if [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
 fi
 
-# Initialize Starship (Prompt)
+# Starship (Prompt)
 eval "$(starship init bash)"
 
-# Initialize Zoxide (Smarter cd)
+# zoxide (Enhanced 'cd')
 eval "$(zoxide init bash)"
+alias cd='z'
 
-# Aliases
-alias ls='ls --color=auto'
-alias ll='ls -lah --color=auto'
-alias l='ls -CF'
+# eza (Enhanced 'ls')
+alias ls='eza --icons --git'
+alias ll='eza -l --icons --git --group-directories-first --time-style=long-iso'
+alias la='eza -la --icons --git --group-directories-first'
+alias l='eza -F --icons'
+alias tree='eza --tree --icons --level=2'
+
+# Bat (Enhanced 'cat')
+export BAT_THEME="Dracula"
+alias cat='bat' 
+alias less='bat --style=plain' 
+
+# fzf (Fuzzy Finder)
+# Adds Ctrl+R (History Search) and Ctrl+T (File Search)
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info"
+if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+    source /usr/share/doc/fzf/examples/key-bindings.bash
+fi
+
+# Navigation
 alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+
+# Safety (interactive mode prevents accidental deletions)
 alias cp='cp -i'
 alias mv='mv -i'
 alias rm='rm -i'
 alias mkdir='mkdir -p'
+
+# Search
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# Bat (Better Cat) configuration
-export BAT_THEME="Dracula"
-
-# FZF (Fuzzy Finder) Keybindings
-if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
-    source /usr/share/doc/fzf/examples/key-bindings.bash
-fi
+# Tool Shortcuts
+alias t='tmux'
+alias ta='tmux attach'
+alias rec='asciinema rec'
+alias play='asciinema play'
+alias ports='nc -vz'  # Quick way to check connections: ports google.com 443
 APPENDBASHRC
 
 # Ensure 'node' user can read these files
