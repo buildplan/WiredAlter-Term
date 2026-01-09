@@ -45,6 +45,9 @@ RUN apt-get update && \
 
 COPY . .
 
+# Copy Config Defaults
+COPY config/ /usr/local/share/smart-term/defaults/
+
 # Setup Seed Directories & Download Font
 RUN mkdir -p /usr/local/share/smart-term/fonts \
              /usr/local/share/smart-term/config && \

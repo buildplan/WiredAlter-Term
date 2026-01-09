@@ -24,165 +24,24 @@ fi
 chown -R node:node /data
 echo "✅ Permissions fixed for /data"
 
-# Generate Defaults
-SEED_CONFIG_DIR="/usr/local/share/smart-term/config"
-mkdir -p "$SEED_CONFIG_DIR"
+# --- Configuration Management ---
+DEFAULTS_DIR="/usr/local/share/smart-term/defaults"
+CONFIG_DIR="/usr/local/share/smart-term/config"
+USER_BASHRC="/home/node/.bashrc"
 
-echo "🌱 Generating default Starship config..."
-cat <<'SSHIP' > "$SEED_CONFIG_DIR/starship.toml"
-"$schema" = 'https://starship.rs/config-schema.json'
+mkdir -p "$CONFIG_DIR"
 
-add_newline = true
-scan_timeout = 30
-command_timeout = 500
+# Starship Config
+echo "🌱 Seeding default Starship config..."
+cp "$DEFAULTS_DIR/starship.default.toml" "$CONFIG_DIR/starship.toml"
 
-format = """
-[░▒▓](#7aa2f7)\
-[  ](bg:#7aa2f7 fg:#15161e)\
-[](fg:#7aa2f7 bg:#3b4261)\
-$hostname\
-$directory\
-[](fg:#3b4261 bg:#292e42)\
-$git_branch\
-$git_status\
-[](fg:#292e42 bg:#1f2335)\
-$cmd_duration\
-$nodejs\
-$rust\
-$golang\
-$php\
-$python\
-$docker_context\
-[](fg:#1f2335)\
-\n$character"""
-
-[hostname]
-ssh_only = true
-ssh_symbol = "🌐 "
-style = "fg:#c0caf5 bg:#3b4261"
-format = "[ $ssh_symbol$hostname ]($style)"
-
-[directory]
-style = "fg:#c0caf5 bg:#3b4261"
-format = "[ $path$read_only ]($style)"
-truncation_length = 3
-truncation_symbol = "…/"
-read_only = " "
-
-[directory.substitutions]
-"Documents" = "󰈙 "
-"Downloads" = " "
-"Music" = " "
-"Pictures" = " "
-
-[git_branch]
-symbol = ""
-style = "fg:#7aa2f7 bg:#292e42"
-format = "[ $symbol $branch ]($style)"
-
-[git_status]
-style = "fg:#bb9af7 bg:#292e42"
-format = "[ $all_status$ahead_behind ]($style)"
-
-[cmd_duration]
-min_time = 2000
-style = "fg:#bb9af7 bg:#1f2335"
-format = "[ ⏱ $duration ]($style)"
-
-[nodejs]
-symbol = ""
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol ($version) ]($style)"
-
-[rust]
-symbol = ""
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol ($version) ]($style)"
-
-[golang]
-symbol = ""
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol ($version) ]($style)"
-
-[php]
-symbol = ""
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol ($version) ]($style)"
-
-[python]
-symbol = "🐍"
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol ($version) ]($style)"
-
-[docker_context]
-symbol = " "
-style = "fg:#7aa2f7 bg:#1f2335"
-format = "[ $symbol $context ]($style)"
-
-[character]
-success_symbol = "[➜](bold #7aa2f7)"
-error_symbol = "[✗](bold #f7768e)"
-SSHIP
-
-# Append to .bashrc
-echo "⚙️  Configuring shell environment..."
-cat <<'APPENDBASHRC' >> /home/node/.bashrc
-# --- Tools Init ---
-
-# Bash Completion
-if [ -f /etc/bash_completion ]; then
-    . /etc/bash_completion
+# .bashrc Injection
+if ! grep -q "Tools Init" "$USER_BASHRC"; then
+    echo "⚙️  Injecting shell environment..."
+    cat "$DEFAULTS_DIR/bashrc.default" >> "$USER_BASHRC"
+else
+    echo "⚙️  Shell environment already configured."
 fi
-
-# Starship (Prompt)
-eval "$(starship init bash)"
-
-# zoxide (Enhanced 'cd')
-eval "$(zoxide init bash)"
-alias cd='z'
-
-# eza (Enhanced 'ls')
-alias ls='eza --icons --git'
-alias ll='eza -l --icons --git --group-directories-first --time-style=long-iso'
-alias la='eza -la --icons --git --group-directories-first'
-alias l='eza -F --icons'
-alias tree='eza --tree --icons --level=2'
-
-# Bat (Enhanced 'cat')
-export BAT_THEME="Dracula"
-alias cat='bat' 
-alias less='bat --style=plain' 
-
-# fzf (Fuzzy Finder)
-# Adds Ctrl+R (History Search) and Ctrl+T (File Search)
-export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info"
-if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
-    source /usr/share/doc/fzf/examples/key-bindings.bash
-fi
-
-# Navigation
-alias ..='cd ..'
-alias ...='cd ../..'
-alias ....='cd ../../..'
-
-# Safety (interactive mode prevents accidental deletions)
-alias cp='cp -i'
-alias mv='mv -i'
-alias rm='rm -i'
-alias mkdir='mkdir -p'
-
-# Search
-alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
-
-# Tool Shortcuts
-alias t='tmux'
-alias ta='tmux attach'
-alias rec='asciinema rec'
-alias play='asciinema play'
-alias ports='nc -vz'  # Quick way to check connections: ports google.com 443
-APPENDBASHRC
 
 # Ensure 'node' user can read these files
 chmod -R 755 /usr/local/share/smart-term
