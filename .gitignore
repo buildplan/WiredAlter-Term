@@ -6,6 +6,9 @@ npm-debug.log
 data/
 
 # Environment variables
+compose-prod*
+docker-compose-*
+.env*
 .env
 
 # System Files

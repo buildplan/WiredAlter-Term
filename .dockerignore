@@ -19,6 +19,10 @@ Dockerfile
 .github
 
 # Environment variables
+compose.*
+compose-prod*
+docker-compose.*
+.env
 .env*
 
 # OS generated files
