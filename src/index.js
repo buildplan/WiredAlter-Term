@@ -18,19 +18,18 @@ const io = new Server(httpServer);
 
 // --- CONFIGURATION ---
 const PORT = process.env.PORT || 3939;
-const PIN = process.env.PIN; // If undefined, PIN login is disabled
+const PIN = process.env.PIN;
 const PUBLIC_URL = process.env.PUBLIC_URL;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// Location for Starship config
 process.env.STARSHIP_CONFIG = join(process.env.HOME, '.config', 'starship.toml');
 
-// --- 0. PRE-FLIGHT CHECKS ---
+// --- PRE-FLIGHT CHECKS ---
 if (!fs.existsSync('/data/sessions')) {
     fs.mkdirSync('/data/sessions', { recursive: true });
 }
 
-// --- 1. MIDDLEWARE & SECURITY ---
+// --- MIDDLEWARE ---
 app.set('trust proxy', 1);
 
 // Login Rate Limiter (Prevent Brute Force on PIN)
@@ -53,7 +52,7 @@ const generalLimiter = rateLimit({
 
 app.use(generalLimiter);
 
-// OIDC Configuration (Conditional)
+// --- OIDC SETUP ---
 const oidcConfigured = process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID;
 
 if (oidcConfigured) {
@@ -71,14 +70,14 @@ if (oidcConfigured) {
         issuerBaseURL: process.env.OIDC_ISSUER,
         clientSecret: process.env.OIDC_CLIENT_SECRET,
         routes: {
-            login: false,
+            login: false, // Manual trigger
         },
-        idpLogout: false,
-        attemptSilentLogin: false
+        attemptSilentLogin: false,
+        httpTimeout: 5000 // 5 second timeout for back-channel
     }));
 }
 
-// Session Setup
+// --- SESSION SETUP ---
 app.use(session({
     store: new FileStore({
         path: '/data/sessions',
@@ -91,18 +90,38 @@ app.use(session({
     cookie: {
         secure: IS_PRODUCTION,
         httpOnly: true,
-        sameSite: 'lax', // Relaxed for OIDC redirects
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
 app.use(express.json());
 
-// --- 2. ASSETS & ROUTES ---
+// --- DEBUG ERROR HANDLER ---
+app.use((err, req, res, next) => {
+    if (err) {
+        // Only catch OIDC errors
+        if (err.message && (err.message.includes('access_denied') || err.message.includes('id_token') || err.code)) {
+            console.error("❌ OIDC AUTH FAILURE:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+            return res.status(401).send(`
+                <body style="background:#111; color:#f55; font-family:monospace; padding:20px;">
+                    <h2>⚠️ AUTHENTICATION FAILED</h2>
+                    <p><strong>Error:</strong> ${err.message}</p>
+                    <p><strong>Code:</strong> ${err.code || 'N/A'}</p>
+                    <hr style="border-color:#333">
+                    <p>Check the container logs for full details.</p>
+                    <a href="/login" style="color:#fff">Return to Login</a>
+                </body>
+            `);
+        }
+    }
+    next(err);
+});
 
+// --- ASSETS & ROUTES ---
 app.use((req, res, next) => {
     if (req.url === '/favicon.ico') return next();
-    console.log(`[HTTP] ${req.method} ${req.url}`);
+    // console.log(`[HTTP] ${req.method} ${req.url}`); // Quiet logs for now
     next();
 });
 
@@ -120,19 +139,14 @@ app.get('/fonts/font.ttf', (req, res) => {
 // Serve Static Files
 app.use(express.static(join(__dirname, 'public')));
 
-// --- 3. AUTHENTICATION LOGIC ---
-
+// --- AUTH LOGIC ---
 const requireAuth = (req, res, next) => {
     const publicPaths = ['/login', '/auth/login', '/verify-pin', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico', '/auth/config'];
     if (publicPaths.includes(req.path)) return next();
 
-    // 1. Check OIDC
     if (oidcConfigured && req.oidc.isAuthenticated()) return next();
-
-    // 2. Check Local PIN Session
     if (req.session && req.session.authenticated) return next();
 
-    // 3. Not logged in -> Redirect
     res.redirect('/login');
 };
 
@@ -179,23 +193,14 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
 
 // Logout
 app.get('/logout', (req, res) => {
-    req.session.destroy((err) => {
+    req.session.destroy(() => {
         res.clearCookie('appSession');
         res.clearCookie('connect.sid');
         res.redirect('/login');
     });
 });
 
-app.use((err, req, res, next) => {
-    if (err && err.message) {
-        console.error("❌ AUTH FAILURE DETAILS:", err);
-        console.error("   - Code:", err.code);
-        console.error("   - Stage:", err.openIdState);
-    }
-    next(err);
-});
-
-// --- 4. PERSISTENCE SETUP ---
+// --- PERSISTENCE ---
 const setupPersistence = () => {
     const userHome = process.env.HOME;
     const dataDir = '/data';
