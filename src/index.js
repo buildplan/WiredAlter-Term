@@ -71,8 +71,10 @@ if (oidcConfigured) {
         issuerBaseURL: process.env.OIDC_ISSUER,
         clientSecret: process.env.OIDC_CLIENT_SECRET,
         routes: {
-            login: false, // trigger login manually via /auth/login
-        }
+            login: false,
+        },
+        idpLogout: false,
+        attemptSilentLogin: false
     }));
 }
 
@@ -179,9 +181,18 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {
         res.clearCookie('appSession');
-        res.clearCookie('connect.sid');        
+        res.clearCookie('connect.sid');
         res.redirect('/login');
     });
+});
+
+app.use((err, req, res, next) => {
+    if (err && err.message) {
+        console.error("❌ AUTH FAILURE DETAILS:", err);
+        console.error("   - Code:", err.code);
+        console.error("   - Stage:", err.openIdState);
+    }
+    next(err);
 });
 
 // --- 4. PERSISTENCE SETUP ---
