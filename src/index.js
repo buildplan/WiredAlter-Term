@@ -177,12 +177,11 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
 
 // Logout
 app.get('/logout', (req, res) => {
-    req.session.destroy();
-    if (oidcConfigured) {
-        res.oidc.logout({ returnTo: PUBLIC_URL + '/login' });
-    } else {
+    req.session.destroy((err) => {
+        res.clearCookie('appSession');
+        res.clearCookie('connect.sid');        
         res.redirect('/login');
-    }
+    });
 });
 
 // --- 4. PERSISTENCE SETUP ---
