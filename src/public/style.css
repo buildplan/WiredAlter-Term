@@ -164,3 +164,57 @@ body {
     .status { font-size: 1.2rem; }
     .logout-btn { padding: 5px 8px; font-size: 1rem; }
 }
+
+/* --- SSO STYLES --- */
+.sso-wrapper {
+    margin-top: 25px;
+    text-align: center;
+}
+
+.divider {
+    color: #30363d;
+    font-size: 12px;
+    margin-bottom: 15px;
+    position: relative;
+    font-family: 'TermFont', monospace;
+    opacity: 0.5;
+}
+
+.divider::before, .divider::after {
+    content: "";
+    display: inline-block;
+    width: 30px;
+    height: 1px;
+    background: #30363d;
+    vertical-align: middle;
+    margin: 0 10px;
+}
+
+.sso-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #58a6ff; /* GitHub Blue */
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    width: 80%;
+    margin: 0 auto;
+    font-weight: bold;
+}
+
+.sso-btn:hover {
+    background: #1f242d;
+    border-color: #58a6ff;
+    box-shadow: 0 0 15px rgba(88, 166, 255, 0.15);
+}
+
+.sso-btn:active {
+    transform: scale(0.98);
+}

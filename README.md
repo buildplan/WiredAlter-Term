@@ -11,14 +11,15 @@ It provides a full-featured terminal environment in your browser with persistent
 * **Customizable Aesthetics:** Ships with "Hack" Nerd Font and a Debian-themed Starship prompt. Both are fully customizable via the host filesystem.
 * **Docker Control:** Run `docker ps`, `docker build`, and other commands directly from the browser (maps the host's Docker socket securely).
 * **Portable & Self-Healing:**
-    * **Auto-Permissions:** Automatically detects the host's Docker GID and maps it, preventing "Permission Denied" errors on any OS.
-    * **Factory Reset:** Automatically detects missing config files and restores defaults if they are deleted.
+  * **Auto-Permissions:** Automatically detects the host's Docker GID and maps it, preventing "Permission Denied" errors on any OS.
+  * **Factory Reset:** Automatically detects missing config files and restores defaults if they are deleted.
 
 ---
 
 ## Quick Start
 
 ### 1. Installation
+
 Clone the repository and start the container:
 
 ```bash

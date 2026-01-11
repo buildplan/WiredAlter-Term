@@ -14,4 +14,18 @@ services:
       - NODE_ENV=production
       - PIN=324252             # <--- Change this
       - SESSION_SECRET=sup3r_s3cr3t_k3y_chang3_m3 # <--- Change this
+
+      # --- AUTH MODES ---
+      # 1. PIN Only: Uncomment PIN, leave OIDC vars empty
+      # 2. SSO Only: Comment out PIN, fill OIDC vars
+      # 3. Hybrid:   Uncomment PIN, fill OIDC vars
+
+      - PIN=123456
+
+      # --- OIDC / SSO CONFIG ---
+      # - PUBLIC_URL=https://term.yourdomain.com
+      # - OIDC_ISSUER=https://auth.yourdomain.com/application/o/wiredterm/
+      # - OIDC_CLIENT_ID=your_client_id
+      # - OIDC_CLIENT_SECRET=your_client_secret
+
     restart: unless-stopped
