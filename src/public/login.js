@@ -1,10 +1,39 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const themeBtn = document.getElementById('theme-btn');
+    const iconSun = document.getElementById('icon-sun');
+    const iconMoon = document.getElementById('icon-moon');
+
+    const isLightStart = document.documentElement.classList.contains('light');
+    updateThemeIcons(isLightStart);
+
+    function updateThemeIcons(isLight) {
+        if (isLight) {
+            iconSun.style.display = 'none';
+            iconMoon.style.display = 'inline';
+        } else {
+            iconSun.style.display = 'inline';
+            iconMoon.style.display = 'none';
+        }
+    }
+
+    themeBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); 
+        const html = document.documentElement;
+        const isLight = html.classList.toggle('light');
+        localStorage.setItem('wired-term-theme', isLight ? 'light' : 'dark');
+        updateThemeIcons(isLight);
+    });
+
+
+    // --- EXISTING LOGIN LOGIC ---
     const input = document.getElementById('realPinInput');
     const feedback = document.getElementById('feedbackMsg');
     const cursor = document.getElementById('fakeCursor');
 
-    // Keep focus on input
-    document.addEventListener('click', () => input.focus());
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#theme-btn')) return;
+        input.focus();
+    });
 
     // Handle Enter Key
     input.addEventListener('keydown', async (e) => {

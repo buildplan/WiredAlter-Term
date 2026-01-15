@@ -10,7 +10,16 @@
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
+
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('wired-term-theme');
+            if (storedTheme === 'light') {
+                document.documentElement.classList.add('light');
+            }
+        })();
+    </script>
 </head>
 <body>
     <div class="container">
@@ -18,12 +27,21 @@
             <span id="connection-status" class="status">
                 <span class="status-icon">🟡</span> <span class="status-text">Connecting...</span>
             </span>
+
             <span class="title">
                 WiredTerm <span class="title-details">~ Debian 13 ~ Node 25</span>
             </span>
-            <button id="logout-btn" class="logout-btn">
-                <span class="btn-text">Logout</span> ⏻
-            </button>
+
+            <div class="controls">
+                <button id="theme-btn" class="icon-btn" title="Toggle Theme">
+                    <span id="icon-sun">☀️</span>
+                    <span id="icon-moon" style="display:none;">🌙</span>
+                </button>
+                
+                <button id="logout-btn" class="logout-btn icon-btn">
+                    <span class="btn-text">Logout</span> ⏻
+                </button>
+            </div>
         </div>
         <div id="terminal"></div>
     </div>
