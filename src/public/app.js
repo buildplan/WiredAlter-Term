@@ -1,3 +1,22 @@
+// --- THEME CONFIGURATION ---
+const themes = {
+    dark: {
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#58a6ff',
+        selectionBackground: '#58a6ff33'
+    },
+    light: {
+        background: '#ffffff',
+        foreground: '#24292f',
+        cursor: '#0969da',
+        selectionBackground: '#0969da33'
+    }
+};
+
+// Determine initial theme
+const currentTheme = localStorage.getItem('wired-term-theme') === 'light' ? 'light' : 'dark';
+
 // Initialize Socket
 const socket = io({
     reconnection: true,
@@ -5,7 +24,7 @@ const socket = io({
     reconnectionDelay: 1000
 });
 
-// Initialize Terminal
+// Initialize Terminal with CORRECT initial theme
 const term = new Terminal({
     cursorBlink: true,
     fontFamily: "'TermFont', monospace",
@@ -13,12 +32,7 @@ const term = new Terminal({
     fontWeight: 'normal',
     fontWeightBold: 'bold',
     allowTransparency: true,
-    theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-        cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33'
-    }
+    theme: themes[currentTheme] // Apply saved theme on start
 });
 
 const fitAddon = new FitAddon.FitAddon();
@@ -27,6 +41,32 @@ term.loadAddon(fitAddon);
 // --- UI Elements ---
 const statusElem = document.getElementById('connection-status');
 const logoutBtn = document.getElementById('logout-btn');
+const themeBtn = document.getElementById('theme-btn');
+const iconSun = document.getElementById('icon-sun');
+const iconMoon = document.getElementById('icon-moon');
+
+// --- Theme Logic ---
+function updateThemeIcons(isLight) {
+    if (isLight) {
+        iconSun.style.display = 'none';
+        iconMoon.style.display = 'inline';
+    } else {
+        iconSun.style.display = 'inline';
+        iconMoon.style.display = 'none';
+    }
+}
+
+// Set initial icon state
+updateThemeIcons(currentTheme === 'light');
+
+themeBtn.addEventListener('click', () => {
+    const html = document.documentElement;
+    const isLight = html.classList.toggle('light');
+    const newTheme = isLight ? 'light' : 'dark';
+    localStorage.setItem('wired-term-theme', newTheme);
+    term.options.theme = themes[newTheme];
+    updateThemeIcons(isLight);
+});
 
 // --- Socket Event Handlers ---
 socket.on('connect', () => {
@@ -103,7 +143,7 @@ term.onData(data => {
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-    logoutBtn.textContent = 'Logging out...';
+    logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
     window.location.href = '/logout';
 });
 

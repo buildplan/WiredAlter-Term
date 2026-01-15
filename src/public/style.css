@@ -6,68 +6,128 @@
   font-display: block;
 }
 
+/* --- THEME VARIABLES --- */
+:root {
+    --bg-body: #0d1117;
+    --bg-container: #161b22;
+    --bg-header: #21262d;
+    --border-color: #30363d;
+    --text-main: #c9d1d9;
+    --text-title: #58a6ff;
+    --text-muted: #8b949e;
+    --btn-bg: #21262d;
+    --btn-border: #30363d;
+    --btn-text: #f7768e;
+    --btn-hover-bg: #30363d;
+    
+    --term-bg: #0d1117;
+    --term-fg: #c9d1d9;
+    --term-cursor: #58a6ff;
+}
+
+html.light {
+    --bg-body: #ffffff;
+    --bg-container: #f6f8fa;
+    --bg-header: #ffffff;
+    --border-color: #d0d7de;
+    --text-main: #24292f;
+    --text-title: #0969da;
+    --text-muted: #57606a;
+    --btn-bg: #f6f8fa;
+    --btn-border: #d0d7de;
+    --btn-text: #cf222e;
+    --btn-hover-bg: #f3f4f6;
+
+    /* Terminal Specifics */
+    --term-bg: #ffffff;
+    --term-fg: #24292f;
+    --term-cursor: #0969da;
+}
+
 body {
     margin: 0;
-    background-color: #0d1117;
-    color: #c9d1d9;
-    /* Force TermFont for everything */
+    background-color: var(--bg-body);
+    color: var(--text-main);
     font-family: 'TermFont', monospace; 
     height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
     width: 95%;
     height: 95%;
-    background: #161b22;
-    border: 1px solid #30363d;
+    background: var(--bg-container);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: background-color 0.3s, border-color 0.3s;
 }
 
 .header {
-    background: #21262d;
+    background: var(--bg-header);
     padding: 10px 15px;
-    border-bottom: 1px solid #30363d;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
     user-select: none;
+    transition: background-color 0.3s, border-color 0.3s;
 }
-.title { font-weight: bold; color: #58a6ff; }
-.status { font-size: 0.8rem; color: #7ee787; }
-#terminal { flex: 1; padding: 10px; background: #0d1117; }
 
-.logout-btn {
-    background-color: #21262d;
-    border: 1px solid #30363d;
-    color: #f7768e;
-    padding: 4px 10px;
+.title { font-weight: bold; color: var(--text-title); }
+.title-details { color: var(--text-muted); font-weight: normal; font-size: 0.9em;}
+
+.controls { display: flex; gap: 10px; align-items: center; }
+
+/* Terminal Container */
+#terminal { 
+    flex: 1; 
+    padding: 10px; 
+    background: var(--term-bg); 
+    transition: background-color 0.3s; 
+    overflow: hidden;
+}
+
+/* Common Button Styles */
+.icon-btn {
+    background-color: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-main);
+    padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.icon-btn:hover {
+    background-color: var(--btn-hover-bg);
+    border-color: var(--text-muted);
 }
 
+.logout-btn {
+    color: var(--btn-text);
+    font-size: 0.8rem;
+    padding: 4px 10px;
+}
 .logout-btn:hover {
-    background-color: #30363d;
-    border-color: #8b949e;
-    color: #ff5555;
+    color: #ff0000;
 }
 
-.logout-btn:active { transform: scale(0.98); }
-
-/* --- LOGIN PAGE STYLES --- */
+/* LOGIN PAGE */
 .login-body {
-    background-color: #0d1117;
-    color: #a9b1d6;
-    font-family: 'HackNerdFont', monospace;
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'TermFont', monospace;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -77,18 +137,19 @@ body {
 
 .login-container {
     width: 400px;
-    border: 2px solid #30363d;
+    border: 2px solid var(--border-color);
     border-radius: 6px;
-    background: #161b22;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    background: var(--bg-container);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
 .terminal-header {
-    background: #30363d;
+    background: var(--bg-header);
     padding: 8px 12px;
     font-size: 14px;
     font-weight: bold;
-    color: #c9d1d9;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -97,7 +158,7 @@ body {
 .status-dot {
     width: 10px;
     height: 10px;
-    background-color: #ff5555; /* Red for locked */
+    background-color: #ff5555; 
     border-radius: 50%;
     display: inline-block;
 }
@@ -112,40 +173,38 @@ body {
     font-weight: bold;
     margin: 0 auto 20px auto;
     display: block;
+    color: var(--text-title);
 }
 
-.system-msg { margin: 5px 0; font-size: 14px; opacity: 0.8; }
+.system-msg { margin: 5px 0; font-size: 14px; opacity: 0.8; color: var(--text-main); }
 
 .input-wrapper {
     margin-top: 25px;
-    background: #000;
+    background: var(--term-bg);
     padding: 10px;
     border-radius: 4px;
     text-align: left;
     position: relative;
-    border: 1px solid #30363d;
+    border: 1px solid var(--border-color);
 }
 
 .prompt {
-    color: #73daca; /* Green */
+    color: #73daca; 
     margin-right: 10px;
 }
 
+html.light .prompt { color: #0969da; }
+html.light .cursor { color: #0969da; }
+
 #realPinInput {
     position: absolute;
-    opacity: 0; /* Hide the real input but keep focus */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    opacity: 0; 
+    top: 0; left: 0; width: 100%; height: 100%;
     cursor: text;
 }
 
 .cursor { color: #7aa2f7; animation: blink 1s step-end infinite; }
-
-@keyframes blink {
-    50% { opacity: 0; }
-}
+@keyframes blink { 50% { opacity: 0; } }
 
 .feedback {
     margin-top: 15px;
@@ -154,7 +213,7 @@ body {
     font-size: 13px;
 }
 
-/* --- MOBILE RESPONSIVENESS --- */
+/* MOBILE RESPONSIVENESS */
 @media (max-width: 600px) {
     .header { padding: 5px 10px; }
     .title-details, 
