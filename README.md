@@ -10,15 +10,17 @@ It provides a full-featured terminal environment in your browser with persistent
 * **General Storage:** A dedicated `~/storage` directory for saving downloads, scripts, or project files persistently.
 * **Customizable Aesthetics:** Ships with "Hack" Nerd Font and a Debian-themed Starship prompt. Both are fully customizable via the host filesystem.
 * **Docker Control:** Run `docker ps`, `docker build`, and other commands directly from the browser (maps the host's Docker socket securely).
+* **Uploads** Allows file uploads, drag and drop files directly in the terminal window. Files will be uploaded in `/data/`directory.
 * **Portable & Self-Healing:**
-    * **Auto-Permissions:** Automatically detects the host's Docker GID and maps it, preventing "Permission Denied" errors on any OS.
-    * **Factory Reset:** Automatically detects missing config files and restores defaults if they are deleted.
+  * **Auto-Permissions:** Automatically detects the host's Docker GID and maps it, preventing "Permission Denied" errors on any OS.
+  * **Factory Reset:** Automatically detects missing config files and restores defaults if they are deleted.
 
 ---
 
 ## Quick Start
 
 ### 1. Installation
+
 Clone the repository and start the container:
 
 ```bash
@@ -47,6 +49,7 @@ All persistent data lives in the local `./data/` folder on your host machine. Th
 | **Config** | `~/.config/` | `./data/.config/` | Starship configuration. |
 | **Shell** | `~/.bashrc` | `./data/.bashrc` | Custom aliases and environment vars. |
 | **Fonts** | *(Internal)* | `./data/fonts/` | The font file served to the browser. |
+| **Uploads** | *(Internal)* | `./data/<uploaded_file>/` | Allows darg and drop files into the terminal to upload in /data. |
 
 ### Using General Storage
 
