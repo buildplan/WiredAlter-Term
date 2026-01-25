@@ -10,12 +10,11 @@ import sessionFileStore from 'session-file-store';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
 const DATA_DIR = IS_TEST ? join(__dirname, '../test_data') : '/data';
-
 const FileStore = sessionFileStore(session);
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
