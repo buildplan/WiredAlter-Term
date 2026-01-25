@@ -83,7 +83,7 @@ function startLatencyCheck() {
 socket.on('latency:pong', (timestamp) => {
     const latency = Date.now() - timestamp;
     signalElem.title = `Latency: ${latency}ms`;
-    
+
     signalElem.className = 'signal-bars'; // Reset
     if (latency < 100) signalElem.classList.add('signal-good');
     else if (latency < 300) signalElem.classList.add('signal-fair');
@@ -140,7 +140,6 @@ dropOverlay.addEventListener('drop', async (e) => {
         formData.append('files', file);
     }
 
-    // Visual feedback in terminal (optional, server will also echo)
     term.write('\r\n\x1b[36m📤 Uploading ' + files.length + ' file(s)...\x1b[0m\r\n');
 
     try {
@@ -148,11 +147,11 @@ dropOverlay.addEventListener('drop', async (e) => {
             method: 'POST',
             body: formData
         });
-        
         if (!res.ok) throw new Error('Upload failed');
-        // Success is handled by the server sending a terminal message
+        socket.emit('terminal:input', '\r');
     } catch (err) {
         term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
+        socket.emit('terminal:input', '\r');
     }
 });
 
