@@ -13,6 +13,7 @@ import multer from 'multer';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
 const DATA_DIR = IS_TEST ? join(__dirname, '../test_data') : '/data';
+const PUBLIC_DIR = join(__dirname, 'public');
 const FileStore = sessionFileStore(session);
 
 const app = express();
@@ -126,7 +127,9 @@ const requireAuth = (req, res, next) => {
 
 app.use(requireAuth);
 
-// --- 3. GENERAL MIDDLEWARE ---
+// --- 3. GENERAL MIDDLEWARE & ROUTES ---
+
+// Upload Handler
 app.post('/upload', upload.array('files'), (req, res) => {
     if (!req.files || !Array.isArray(req.files)) {
         return res.status(400).json({ error: 'Invalid upload data received.' });
@@ -145,28 +148,29 @@ app.post('/upload', upload.array('files'), (req, res) => {
     res.json({ success: true, count: req.files.length });
 });
 
+// Logging & Favicon
 app.use((req, res, next) => {
     if (req.url === '/favicon.ico') return next();
     console.log(`[HTTP] ${req.method} ${req.url}`);
     next();
 });
-
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// Serve Font
+app.use(express.static(PUBLIC_DIR));
+
 app.get('/fonts/font.ttf', (req, res) => {
-    const fontPath = join(__dirname, 'public/fonts/font.ttf');
+    const fontPath = join(PUBLIC_DIR, 'fonts/font.ttf');
     if (!fs.existsSync(fontPath)) return res.status(404).send('Font not found');
+    
     res.setHeader('Content-Type', 'font/ttf');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.sendFile(fontPath);
 });
 
-app.use(express.static(join(__dirname, 'public')));
-
 // --- 4. PERSISTENCE SETUP ---
 const setupPersistence = () => {
     if (IS_TEST) return;
+    
     const userHome = process.env.HOME;
     const dataDir = '/data';
     const seedDir = '/usr/local/share/smart-term';
@@ -205,7 +209,7 @@ const setupPersistence = () => {
     };
 
     // Font Persistence
-    const publicFonts = join(__dirname, 'public/fonts');
+    const publicFonts = join(PUBLIC_DIR, 'fonts');
     const persistentFonts = join(dataDir, 'fonts');
     const seedFonts = join(seedDir, 'fonts');
 
@@ -257,11 +261,8 @@ io.on('connection', (socket) => {
 export { app };
 
 // --- START SERVER ---
-if (process.env.NODE_ENV !== 'test') {
+if (!IS_TEST) {
     httpServer.listen(PORT, () => {
         console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
     });
 }
-httpServer.listen(PORT, () => {
-    console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
-});
