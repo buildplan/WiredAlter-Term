@@ -24,9 +24,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <span id="connection-status" class="status">
-                <span class="status-icon">🟡</span> <span class="status-text">Connecting...</span>
-            </span>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="connection-status" class="status">...</span>
+                <div id="signal-strength" class="signal-bars" title="Latency: --ms">
+                    <div class="bar bar-1"></div>
+                    <div class="bar bar-2"></div>
+                    <div class="bar bar-3"></div>
+                </div>
+            </div>
+        </div>
 
             <span class="title">
                 WiredTerm <span class="title-details">~ Debian 13 ~ Node 25</span>
@@ -43,7 +49,15 @@
                 </button>
             </div>
         </div>
+
         <div id="terminal"></div>
+
+        <div id="drop-overlay" class="drop-overlay hidden">
+            <div class="drop-message">
+                <span style="font-size: 4rem;">📂</span>
+                <br>Drop files to upload to <br><code>/data</code>
+            </div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

@@ -8,6 +8,7 @@ import fs from 'fs';
 import session from 'express-session';
 import sessionFileStore from 'session-file-store';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
 
 const FileStore = sessionFileStore(session);
 
@@ -49,6 +50,18 @@ const generalLimiter = rateLimit({
     legacyHeaders: false,
     message: "Too many requests. Please slow down."
 });
+
+// --- UPLOAD CONFIGURATION ---
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, '/data'); 
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname);
+    }
+});
+
+const upload = multer({ storage });
 
 // Apply general limiter globally to all routes
 app.use(generalLimiter);
@@ -111,6 +124,14 @@ const requireAuth = (req, res, next) => {
 app.use(requireAuth);
 
 // --- 3. GENERAL MIDDLEWARE ---
+app.post('/upload', upload.array('files'), (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded.' });
+    }
+    const fileList = req.files.map(f => f.originalname).join(', ');
+    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
+    res.json({ success: true, count: req.files.length });
+});
 
 app.use((req, res, next) => {
     if (req.url === '/favicon.ico') return next();
@@ -214,6 +235,10 @@ io.on('connection', (socket) => {
         try { ptyProcess.resize(cols, rows); } catch (err) {}
     });
     socket.on('disconnect', () => ptyProcess.kill());
+    // Latency Ping-Pong
+    socket.on('latency:ping', (timestamp) => {
+        socket.emit('latency:pong', timestamp);
+    });
 });
 
 httpServer.listen(PORT, () => {

@@ -68,17 +68,92 @@ themeBtn.addEventListener('click', () => {
     updateThemeIcons(isLight);
 });
 
+// --- CONNECTION STRENGTH LOGIC ---
+const signalElem = document.getElementById('signal-strength');
+let pingInterval;
+
+function startLatencyCheck() {
+    clearInterval(pingInterval);
+    pingInterval = setInterval(() => {
+        const start = Date.now();
+        socket.emit('latency:ping', start);
+    }, 2000); // Check every 2 seconds
+}
+
+socket.on('latency:pong', (timestamp) => {
+    const latency = Date.now() - timestamp;
+    signalElem.title = `Latency: ${latency}ms`;
+    
+    signalElem.className = 'signal-bars'; // Reset
+    if (latency < 100) signalElem.classList.add('signal-good');
+    else if (latency < 300) signalElem.classList.add('signal-fair');
+    else signalElem.classList.add('signal-poor');
+});
+
 // --- Socket Event Handlers ---
 socket.on('connect', () => {
     statusElem.innerHTML = '<span class="status-icon">🟢</span> <span class="status-text">Connected</span>';
     statusElem.style.color = '#7ee787';
     statusElem.style.opacity = '1';
+    startLatencyCheck();
 });
 
 socket.on('disconnect', () => {
     statusElem.innerHTML = '<span class="status-icon">🔴</span> <span class="status-text">Disconnected</span>';
     statusElem.style.color = '#ff5555';
     statusElem.style.opacity = '0.8';
+    clearInterval(pingInterval);
+    signalElem.className = 'signal-bars'; // Reset to gray
+});
+
+// --- DRAG & DROP UPLOAD LOGIC ---
+const dropOverlay = document.getElementById('drop-overlay');
+const container = document.querySelector('.container');
+
+// Detect drag entering the window
+window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dropOverlay.classList.add('active');
+});
+
+// Handle events on the overlay specifically
+dropOverlay.addEventListener('dragenter', (e) => e.preventDefault());
+dropOverlay.addEventListener('dragover', (e) => e.preventDefault());
+
+dropOverlay.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    // Only hide if we actually left the window/overlay rect
+    if (e.relatedTarget === null) {
+        dropOverlay.classList.remove('active');
+    }
+});
+
+dropOverlay.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropOverlay.classList.remove('active');
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files', file);
+    }
+
+    // Visual feedback in terminal (optional, server will also echo)
+    term.write('\r\n\x1b[36m📤 Uploading ' + files.length + ' file(s)...\x1b[0m\r\n');
+
+    try {
+        const res = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!res.ok) throw new Error('Upload failed');
+        // Success is handled by the server sending a terminal message
+    } catch (err) {
+        term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
+    }
 });
 
 socket.on('connect_error', () => {
