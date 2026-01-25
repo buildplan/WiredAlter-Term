@@ -46,6 +46,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=ref,event=branch
             type=semver,pattern={{version}}
 
       # Build and Push
@@ -60,13 +61,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 6. Cleanup (Keep only last 5 versions to save storage)
-      # - name: Clean up old GHCR images
-        # uses: quartx-analytics/ghcr-cleaner@v1
-        # with:
-          # owner-type: user
-          # token: ${{ secrets.PAT_TOKEN }}
-          # repository-owner: ${{ github.repository_owner }}
-          # repository-name: ${{ github.event.repository.name }} 
-          # delete-untagged: true
-          # keep-at-most: 5
+      # Cleanup
+      - name: Clean up old GHCR images
+        uses: quartx-analytics/ghcr-cleaner@v1
+        with:
+          owner-type: user
+          token: ${{ secrets.PAT_TOKEN }}
+          repository-owner: ${{ github.repository_owner }}
+          repository-name: ${{ github.event.repository.name }}
+          delete-untagged: true
+          keep-at-most: 10
