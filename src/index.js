@@ -244,12 +244,20 @@ io.on('connection', (socket) => {
         try { ptyProcess.resize(cols, rows); } catch (err) {}
     });
     socket.on('disconnect', () => ptyProcess.kill());
-    // Latency Ping-Pong
     socket.on('latency:ping', (timestamp) => {
         socket.emit('latency:pong', timestamp);
     });
 });
 
+// --- EXPORT FOR TESTING ---
+export { app };
+
+// --- START SERVER ---
+if (process.env.NODE_ENV !== 'test') {
+    httpServer.listen(PORT, () => {
+        console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
+    });
+}
 httpServer.listen(PORT, () => {
     console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
 });
