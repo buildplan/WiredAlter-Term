@@ -1,17 +1,38 @@
 {
-  "name": "wa-term",
-  "version": "1.2.0",
+  "name": "wiredalter-term",
+  "version": "0.3.0",
+  "description": "A self-hosted web terminal with persistent storage and file management.",
   "type": "module",
+  "private": true,
+  "license": "GPL-3.0",
+  "author": {
+    "name": "buildPlan",
+    "email": "hello@buildPlan.org",
+    "url": "https://github.com/buildplan"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buildplan/WiredAlter-Term.git"
+  },
+  "homepage": "https://github.com/buildplan/WiredAlter-Term#readme",
+  "bugs": {
+    "url": "https://github.com/buildplan/WiredAlter-Term/issues"
+  },
+  "engines": {
+    "node": ">=25.0.0"
+  },
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "NODE_ENV=test node --test"
   },
   "dependencies": {
     "express": "^5.2.1",
-    "socket.io": "^4.8.3",
-    "node-pty": "^1.1.0",
-    "express-session": "^1.18.2",
-    "session-file-store": "^1.5.0",
     "express-rate-limit": "^8.2.1",
-    "multer": "^2.0.2"
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "node-pty": "^1.1.0",
+    "session-file-store": "^1.5.0",
+    "socket.io": "^4.8.3"
   }
 }
