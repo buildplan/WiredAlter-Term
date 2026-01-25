@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ "main", "dev", "dev-", "dev_" ]
+    branches: [ "main", "dev", "dev-*", "dev_*" ]
     tags: [ 'v*.*.*' ]
   workflow_dispatch:
 
