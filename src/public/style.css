@@ -213,6 +213,60 @@ html.light .cursor { color: #0969da; }
     font-size: 13px;
 }
 
+/* --- SIGNAL STRENGTH --- */
+.signal-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 16px;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+.signal-bars:hover { opacity: 1; }
+
+.bar { width: 4px; background-color: var(--border-color); border-radius: 1px; }
+.bar-1 { height: 30%; }
+.bar-2 { height: 60%; }
+.bar-3 { height: 100%; }
+
+/* Classes applied via JS based on ping */
+.signal-good .bar { background-color: #7ee787; } /* Green */
+.signal-fair .bar { background-color: #e0af68; } /* Yellow */
+.signal-fair .bar-3 { background-color: var(--border-color); } /* Dim the top bar */
+.signal-poor .bar { background-color: #ff5555; } /* Red */
+.signal-poor .bar-2, .signal-poor .bar-3 { background-color: var(--border-color); }
+
+/* --- DRAG & DROP OVERLAY --- */
+.drop-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(13, 17, 23, 0.9);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none; /* Let events pass through until active */
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
+
+.drop-overlay.active {
+    pointer-events: all;
+    opacity: 1;
+}
+
+.drop-message {
+    color: var(--text-title);
+    text-align: center;
+    font-weight: bold;
+    border: 3px dashed var(--text-title);
+    padding: 40px;
+    border-radius: 10px;
+    background: var(--bg-container);
+}
+
 /* MOBILE RESPONSIVENESS */
 @media (max-width: 600px) {
     .header { padding: 5px 10px; }
