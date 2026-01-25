@@ -139,9 +139,9 @@ app.post('/upload', upload.array('files'), (req, res) => {
     }
     const fileList = req.files
         .map(f => {
-            return (f && typeof f.originalname === 'string') 
-                ? f.originalname 
-                : 'unknown_file'; 
+            return (f && typeof f.originalname === 'string')
+                ? f.originalname
+                : 'unknown_file';
         })
         .join(', ');
     io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
@@ -161,7 +161,7 @@ app.use(express.static(PUBLIC_DIR));
 app.get('/fonts/font.ttf', (req, res) => {
     const fontPath = join(PUBLIC_DIR, 'fonts/font.ttf');
     if (!fs.existsSync(fontPath)) return res.status(404).send('Font not found');
-    
+
     res.setHeader('Content-Type', 'font/ttf');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.sendFile(fontPath);
@@ -170,7 +170,7 @@ app.get('/fonts/font.ttf', (req, res) => {
 // --- 4. PERSISTENCE SETUP ---
 const setupPersistence = () => {
     if (IS_TEST) return;
-    
+
     const userHome = process.env.HOME;
     const dataDir = '/data';
     const seedDir = '/usr/local/share/smart-term';
