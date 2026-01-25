@@ -11,7 +11,32 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # JOB 1: RUN TESTS
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 25
+        uses: actions/setup-node@v6
+        with:
+          node-version: '25'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y make g++ python3
+          npm ci
+
+      # Run the test script
+      - name: Run Tests
+        run: npm test
+
+  # JOB 2: BUILD & PUSH (Only runs if 'test' passes)
   build-and-push:
+    needs: test 
     runs-on: ubuntu-latest
     permissions:
       contents: read

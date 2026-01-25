@@ -10,9 +10,12 @@ import sessionFileStore from 'session-file-store';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const IS_TEST = process.env.NODE_ENV === 'test';
+const DATA_DIR = IS_TEST ? join(__dirname, '../test_data') : '/data';
+const PUBLIC_DIR = join(__dirname, 'public');
 const FileStore = sessionFileStore(session);
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
@@ -24,8 +27,9 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 process.env.STARSHIP_CONFIG = join(process.env.HOME, '.config', 'starship.toml');
 
 // --- 0. PRE-FLIGHT CHECKS ---
-if (!fs.existsSync('/data/sessions')) {
-    fs.mkdirSync('/data/sessions', { recursive: true });
+const sessionsDir = join(DATA_DIR, 'sessions');
+if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir, { recursive: true });
 }
 
 // --- 1. SECURITY MIDDLEWARE SETUP ---
@@ -54,7 +58,7 @@ const generalLimiter = rateLimit({
 // --- UPLOAD CONFIGURATION ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, '/data'); 
+        cb(null, DATA_DIR);
     },
     filename: (req, file, cb) => {
         cb(null, file.originalname);
@@ -68,7 +72,7 @@ app.use(generalLimiter);
 
 app.use(session({
     store: new FileStore({
-        path: '/data/sessions',
+        path: sessionsDir,
         ttl: 86400,
         retries: 0
     }),
@@ -123,7 +127,9 @@ const requireAuth = (req, res, next) => {
 
 app.use(requireAuth);
 
-// --- 3. GENERAL MIDDLEWARE ---
+// --- 3. GENERAL MIDDLEWARE & ROUTES ---
+
+// Upload Handler
 app.post('/upload', upload.array('files'), (req, res) => {
     if (!req.files || !Array.isArray(req.files)) {
         return res.status(400).json({ error: 'Invalid upload data received.' });
@@ -133,36 +139,38 @@ app.post('/upload', upload.array('files'), (req, res) => {
     }
     const fileList = req.files
         .map(f => {
-            return (f && typeof f.originalname === 'string') 
-                ? f.originalname 
-                : 'unknown_file'; 
+            return (f && typeof f.originalname === 'string')
+                ? f.originalname
+                : 'unknown_file';
         })
         .join(', ');
     io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
     res.json({ success: true, count: req.files.length });
 });
 
+// Logging & Favicon
 app.use((req, res, next) => {
     if (req.url === '/favicon.ico') return next();
     console.log(`[HTTP] ${req.method} ${req.url}`);
     next();
 });
-
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// Serve Font
+app.use(express.static(PUBLIC_DIR));
+
 app.get('/fonts/font.ttf', (req, res) => {
-    const fontPath = join(__dirname, 'public/fonts/font.ttf');
+    const fontPath = join(PUBLIC_DIR, 'fonts/font.ttf');
     if (!fs.existsSync(fontPath)) return res.status(404).send('Font not found');
+
     res.setHeader('Content-Type', 'font/ttf');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.sendFile(fontPath);
 });
 
-app.use(express.static(join(__dirname, 'public')));
-
 // --- 4. PERSISTENCE SETUP ---
 const setupPersistence = () => {
+    if (IS_TEST) return;
+
     const userHome = process.env.HOME;
     const dataDir = '/data';
     const seedDir = '/usr/local/share/smart-term';
@@ -201,7 +209,7 @@ const setupPersistence = () => {
     };
 
     // Font Persistence
-    const publicFonts = join(__dirname, 'public/fonts');
+    const publicFonts = join(PUBLIC_DIR, 'fonts');
     const persistentFonts = join(dataDir, 'fonts');
     const seedFonts = join(seedDir, 'fonts');
 
@@ -244,12 +252,17 @@ io.on('connection', (socket) => {
         try { ptyProcess.resize(cols, rows); } catch (err) {}
     });
     socket.on('disconnect', () => ptyProcess.kill());
-    // Latency Ping-Pong
     socket.on('latency:ping', (timestamp) => {
         socket.emit('latency:pong', timestamp);
     });
 });
 
-httpServer.listen(PORT, () => {
-    console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
-});
+// --- EXPORT FOR TESTING ---
+export { app };
+
+// --- START SERVER ---
+if (!IS_TEST) {
+    httpServer.listen(PORT, () => {
+        console.log(`🚀 WiredAlter-Term running on http://localhost:${PORT}`);
+    });
+}
