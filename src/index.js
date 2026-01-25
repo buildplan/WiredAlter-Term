@@ -125,10 +125,19 @@ app.use(requireAuth);
 
 // --- 3. GENERAL MIDDLEWARE ---
 app.post('/upload', upload.array('files'), (req, res) => {
-    if (!req.files || req.files.length === 0) {
+    if (!req.files || !Array.isArray(req.files)) {
+        return res.status(400).json({ error: 'Invalid upload data received.' });
+    }
+    if (req.files.length === 0) {
         return res.status(400).json({ error: 'No files uploaded.' });
     }
-    const fileList = req.files.map(f => f.originalname).join(', ');
+    const fileList = req.files
+        .map(f => {
+            return (f && typeof f.originalname === 'string') 
+                ? f.originalname 
+                : 'unknown_file'; 
+        })
+        .join(', ');
     io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
     res.json({ success: true, count: req.files.length });
 });
