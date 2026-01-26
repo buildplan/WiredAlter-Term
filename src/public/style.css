@@ -23,6 +23,14 @@
     --term-bg: #0d1117;
     --term-fg: #c9d1d9;
     --term-cursor: #58a6ff;
+
+    --tab-bar-bg: #010409;
+    --tab-bg: #21262d;
+    --tab-bg-hover: #30363d;
+    --tab-text: #8b949e;
+    --tab-active-bg: #0d1117;
+    --tab-active-text: #e6edf3;
+    --tab-border: #30363d;
 }
 
 html.light {
@@ -42,6 +50,15 @@ html.light {
     --term-bg: #ffffff;
     --term-fg: #24292f;
     --term-cursor: #0969da;
+
+    /* Tab Specific Variables */
+    --tab-bar-bg: #eff1f3;
+    --tab-bg: #e1e4e8;
+    --tab-bg-hover: #d0d7de;
+    --tab-text: #57606a;
+    --tab-active-bg: #ffffff;
+    --tab-active-text: #24292f;
+    --tab-border: #d0d7de;
 }
 
 body {
@@ -92,6 +109,121 @@ body {
     background: var(--term-bg); 
     transition: background-color 0.3s; 
     overflow: hidden;
+}
+
+/* Tab Bar Container */
+.tabs-header {
+    display: flex;
+    align-items: center;
+    background: var(--tab-bar-bg);
+    border-bottom: 1px solid var(--tab-border);
+    height: 36px;
+    padding: 0 4px;
+    user-select: none;
+    transition: background 0.3s, border-color 0.3s;
+}
+
+/* Individual Tab */
+.tabs-list {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    flex: 1;
+    height: 100%;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    max-width: 200px;
+    min-width: 120px;
+    height: 28px;
+    background: var(--tab-bg);
+    color: var(--tab-text);
+    margin-right: 2px;
+    padding: 0 10px;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.1s;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+
+.tab:hover { background: var(--tab-bg-hover); }
+
+.tab.active {
+    background: var(--tab-active-bg);
+    color: var(--tab-active-text);
+    border-top: 1px solid var(--tab-border);
+    border-left: 1px solid var(--tab-border);
+    border-right: 1px solid var(--tab-border);
+    position: relative;
+    top: 1px;
+    z-index: 10;
+}
+
+/* Tab Content */
+.tab-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Close Button (x) */
+.tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    opacity: 0.6;
+    font-size: 10px;
+}
+.tab-close:hover {
+    background: #cc4444;
+    color: white;
+    opacity: 1;
+}
+
+/* New Tab Button */
+.new-tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+.new-tab-btn:hover { background: #333; color: #fff; }
+
+/* Workspace Area */
+.terminals-container {
+    position: relative;
+    flex: 1;
+    height: calc(100vh - 36px); /* Subtract tab height */
+    overflow: hidden;
+    background: #000;
+}
+
+.terminal-instance {
+    display: none; /* Hidden by default */
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.terminal-instance.active {
+    display: block;
 }
 
 /* Common Button Styles */
@@ -265,6 +397,32 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     padding: 40px;
     border-radius: 10px;
     background: var(--bg-container);
+}
+
+/* --- GRID MODE (SIDE-BY-SIDE) --- */
+.terminals-container.grid-mode {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
+    grid-auto-rows: 1fr;
+    gap: 4px;
+    background: #333; /* Border color between grids */
+    padding: 4px;
+}
+
+.terminals-container.grid-mode .terminal-instance {
+    display: block !important;
+    position: relative !important;
+    width: auto !important;
+    height: auto !important;
+    border: 2px solid var(--border-color);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.terminals-container.grid-mode .terminal-instance.active {
+    border-color: var(--term-cursor);
+    z-index: 10;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
 /* MOBILE RESPONSIVENESS */
