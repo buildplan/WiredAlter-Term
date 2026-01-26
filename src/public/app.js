@@ -223,7 +223,7 @@ class TerminalTab {
     }
 
     isActive() {
-        return this.element.classList.contains('active');
+        return this.manager.activeTabId === this.id;
     }
 
     activate() {
@@ -231,11 +231,20 @@ class TerminalTab {
         this.tabElement.classList.add('active');
         this.term.focus();
         this.resize();
+        this.syncStatus();
+        setTimeout(() => {
+            if (this.isActive()) this.syncStatus();
+        }, 100);
+    }
 
-        // Update UI status immediately based on this socket's state
-        if(this.socket.connected) this.updateStatus('connected');
-        else if (this.socket.io.engine.readyState === 'closed') this.updateStatus('disconnected');
-        else this.updateStatus('error');
+    syncStatus() {
+        if (this.socket.connected) {
+            this.updateStatus('connected');
+        } else if (this.socket.io.engine.readyState === 'opening') {
+            this.updateStatus('connecting'); // New State!
+        } else {
+            this.updateStatus('disconnected');
+        }
     }
 
     deactivate() {
@@ -259,6 +268,10 @@ class TerminalTab {
         if (state === 'connected') {
             statusElem.innerHTML = '<span class="status-icon">🟢</span> <span class="status-text">Connected</span>';
             statusElem.style.color = '#7ee787';
+            statusElem.style.opacity = '1';
+        } else if (state === 'connecting') {
+            statusElem.innerHTML = '<span class="status-icon">🟡</span> <span class="status-text">Connecting...</span>';
+            statusElem.style.color = '#e0af68';
             statusElem.style.opacity = '1';
         } else if (state === 'disconnected') {
             statusElem.innerHTML = '<span class="status-icon">🔴</span> <span class="status-text">Disconnected</span>';
