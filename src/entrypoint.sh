@@ -53,7 +53,19 @@ if [ -n "$TAILSCALE_AUTH_KEY" ]; then
     tailscaled --tun=userspace-networking --socket=/var/run/tailscale/tailscaled.sock &
     sleep 3
     TS_HOSTNAME="$(hostname)"
-    tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${TS_HOSTNAME}" --ssh --operator=node
+    LOGIN_SERVER_ARG=""
+    if [ -n "$TAILSCALE_LOGIN_SERVER" ]; then
+        echo "   🎯 Custom Control Plane: $TAILSCALE_LOGIN_SERVER"
+        LOGIN_SERVER_ARG="--login-server=${TAILSCALE_LOGIN_SERVER}"
+    fi
+    TS_EXTRA_FLAGS=${TAILSCALE_FLAGS:-"--ssh"}
+    echo "   Using Flags: $TS_EXTRA_FLAGS"
+    tailscale up --authkey="${TAILSCALE_AUTH_KEY}" \
+                 --hostname="${TS_HOSTNAME}" \
+                 --operator=node \
+                 $LOGIN_SERVER_ARG \
+                 $TS_EXTRA_FLAGS
+
     echo "✅ Tailscale started. Hostname: $TS_HOSTNAME"
 else
     echo "⚠️  TAILSCALE_AUTH_KEY not found. Skipping Tailscale start."
