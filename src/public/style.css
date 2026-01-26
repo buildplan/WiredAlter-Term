@@ -23,6 +23,14 @@
     --term-bg: #0d1117;
     --term-fg: #c9d1d9;
     --term-cursor: #58a6ff;
+
+    --tab-bar-bg: #010409;
+    --tab-bg: #21262d;
+    --tab-bg-hover: #30363d;
+    --tab-text: #8b949e;
+    --tab-active-bg: #0d1117;
+    --tab-active-text: #e6edf3;
+    --tab-border: #30363d;
 }
 
 html.light {
@@ -42,6 +50,15 @@ html.light {
     --term-bg: #ffffff;
     --term-fg: #24292f;
     --term-cursor: #0969da;
+
+    /* Tab Specific Variables */
+    --tab-bar-bg: #eff1f3;
+    --tab-bg: #e1e4e8;
+    --tab-bg-hover: #d0d7de;
+    --tab-text: #57606a;
+    --tab-active-bg: #ffffff;
+    --tab-active-text: #24292f;
+    --tab-border: #d0d7de;
 }
 
 body {
@@ -98,11 +115,12 @@ body {
 .tabs-header {
     display: flex;
     align-items: center;
-    background: #1e1e1e; /* Darker than terminal */
-    border-bottom: 1px solid #333;
+    background: var(--tab-bar-bg);
+    border-bottom: 1px solid var(--tab-border);
     height: 36px;
     padding: 0 4px;
     user-select: none;
+    transition: background 0.3s, border-color 0.3s;
 }
 
 /* Individual Tab */
@@ -121,8 +139,8 @@ body {
     max-width: 200px;
     min-width: 120px;
     height: 28px;
-    background: #2d2d2d;
-    color: #888;
+    background: var(--tab-bg);
+    color: var(--tab-text);
     margin-right: 2px;
     padding: 0 10px;
     border-radius: 4px 4px 0 0;
@@ -134,16 +152,16 @@ body {
     margin-right: 4px;
 }
 
-.tab:hover { background: #383838; }
+.tab:hover { background: var(--tab-bg-hover); }
 
 .tab.active {
-    background: #000000; /* Matches terminal bg */
-    color: #fff;
-    border-top: 1px solid #444;
-    border-left: 1px solid #444;
-    border-right: 1px solid #444;
+    background: var(--tab-active-bg);
+    color: var(--tab-active-text);
+    border-top: 1px solid var(--tab-border);
+    border-left: 1px solid var(--tab-border);
+    border-right: 1px solid var(--tab-border);
     position: relative;
-    top: 1px; /* Blends with terminal container */
+    top: 1px;
     z-index: 10;
 }
 
@@ -396,7 +414,7 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     position: relative !important;
     width: auto !important;
     height: auto !important;
-    border: 2px solid #30363d; 
+    border: 2px solid var(--border-color);
     box-sizing: border-box;
     overflow: hidden;
 }
