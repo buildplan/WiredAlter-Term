@@ -9,15 +9,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
     && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
 
-# Active Locale to UK
-ENV LANG=en_US.utf8
+# Active Locales
+ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.utf8
+ENV LC_ALL=en_US.UTF-8
 
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+# Install Tailscale
+COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscale /usr/local/bin/tailscale
+RUN mkdir -p /var/lib/tailscale && \
+    mkdir -p /var/run/tailscale && \
+    chown node:node /var/run/tailscale
 
 WORKDIR /app
 COPY package.json .

@@ -3,15 +3,32 @@ services:
     build: .
     # use this pre-build image from this repo or build your own
     # image: ghcr.io/buildplan/wiredalter-term:latest 
-    container_name: wairedalter-term
+    container_name: wiredalter-term
     hostname: wiredterm  # you can change this whatever you want to see in terminal
     ports:
       - "127.0.0.1:3939:3939"
     volumes:
       - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock # mount Docker sock for host docker management in the terminal
+      - tailscale-data:/var/lib/tailscale # Persist Tailscale state (keys/identity)
     environment:
       - NODE_ENV=production
       - PIN=324252             # <--- Change this
       - SESSION_SECRET=sup3r_s3cr3t_k3y_chang3_m3 # <--- Change this
+
+      # [Required if you want to enable tailscale] Your Auth Key (from Headscale or Tailscale)
+      # Generate this at: https://login.tailscale.com/admin/settings/keys
+      - TAILSCALE_AUTH_KEY=tskey-auth-xxxxxx
+
+      # [Optional] Self-Hosted URL
+      # Leave this commented out to use official Tailscale
+      - TAILSCALE_LOGIN_SERVER=https://headscale.your-domain.com
+
+      # [Optional] Custom Flags
+      # Defaults to "--ssh" if not set. 
+      - TAILSCALE_FLAGS=--ssh --accept-routes
+
     restart: unless-stopped
+
+volumes:
+  tailscale-data:
