@@ -149,14 +149,14 @@ class TerminalTab {
     }
 
     setupSocketEvents() {
-        // Output Handler (Restored)
         this.socket.on('terminal:output', (data) => this.term.write(data));
 
-        // Status Updates
         this.socket.on('connect', () => {
-            if(this.isActive()) this.updateStatus('connected');
-            this.startLatencyCheck();
-            this.resize(); // Sync size on connect
+            if(this.isActive()) {
+                this.syncStatus();
+                this.startLatencyCheck();
+                this.resize();
+            }
         });
 
         this.socket.on('disconnect', () => {
@@ -164,14 +164,13 @@ class TerminalTab {
             clearInterval(this.pingInterval);
         });
 
-        // Error Handler
         this.socket.on('connect_error', () => {
             if(this.isActive()) this.updateStatus('error');
         });
 
         // Latency Pong
         this.socket.on('latency:pong', (timestamp) => {
-            if (!this.isActive()) return; // Only show latency for active tab
+            if (!this.isActive()) return;
 
             const latency = Date.now() - timestamp;
             signalElem.title = `Latency: ${latency}ms`;
