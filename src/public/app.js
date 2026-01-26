@@ -98,6 +98,13 @@ class TerminalTab {
             allowTransparency: true,
             theme: themes[currentTheme]
         });
+        // Focus
+        this.term.textarea.addEventListener('focus', () => {
+            if (this.manager.activeTabId !== this.id) {
+                this.manager.setActiveTab(this.id);
+            }
+        });
+
 
         // 2. Load Addons
         this.fitAddon = new FitAddon.FitAddon();
@@ -335,6 +342,20 @@ class TabManager {
         const tab = new TerminalTab(id, this);
         this.tabs.set(id, tab);
         this.setActiveTab(id);
+        const termContainer = document.getElementById('terminals-container');
+        if (termContainer.classList.contains('grid-mode')) {
+            setTimeout(() => {
+                this.tabs.forEach(t => {
+                    t.fitAddon.fit();
+                    if(t.socket && t.socket.connected) {
+                        t.socket.emit('terminal:resize', {
+                            cols: t.term.cols,
+                            rows: t.term.rows
+                        });
+                    }
+                });
+            }, 100);
+        }
     }
 
     setActiveTab(id) {
