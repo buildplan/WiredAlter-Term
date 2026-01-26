@@ -227,7 +227,7 @@ body {
     flex: 1;
     height: calc(100vh - 36px); /* Subtract tab height */
     overflow: hidden;
-    background: #000;
+    background: var(--bg-body);
 }
 
 .terminal-instance {
