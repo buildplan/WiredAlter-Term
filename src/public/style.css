@@ -106,6 +106,15 @@ body {
 }
 
 /* Individual Tab */
+.tabs-list {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    flex: 1;
+    height: 100%;
+}
+
 .tab {
     display: flex;
     align-items: center;
@@ -121,6 +130,8 @@ body {
     font-size: 0.85rem;
     transition: background 0.1s;
     border: 1px solid transparent;
+    flex-shrink: 0;
+    margin-right: 4px;
 }
 
 .tab:hover { background: #383838; }

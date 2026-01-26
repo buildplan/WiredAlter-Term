@@ -120,6 +120,8 @@ class TerminalTab {
 
         // 3. Connect Socket (New connection per tab)
         this.socket = io({
+            forceNew: true,
+            multiplex: false,
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 1000
@@ -269,12 +271,20 @@ class TerminalTab {
     }
 
     destroy() {
-        clearInterval(this.pingInterval);
-        window.removeEventListener('resize', this.resizeListener);
-        if(this.socket) this.socket.disconnect();
-        if(this.term) this.term.dispose();
-        this.element.remove();
-        this.tabElement.remove();
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
+        if(this.socket) {
+            this.socket.disconnect();
+            if(this.socket.io) this.socket.io.close(); 
+        }
+        try {
+            if(this.webglAddon) this.webglAddon.dispose();
+            if(this.term) this.term.dispose();
+        } catch (e) {
+            console.warn("Cleanup warning:", e);
+        }
+        if (this.element) this.element.remove();
+        if (this.tabElement) this.tabElement.remove();
     }
 }
 
