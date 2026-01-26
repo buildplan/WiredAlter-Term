@@ -267,18 +267,30 @@ class TerminalTab {
         input.focus();
         input.select();
 
+        let isSaving = false;
+
         const saveName = () => {
+            if (isSaving) return;
+            isSaving = true;
+
             this.name = input.value || currentName;
             const newSpan = document.createElement('span');
             newSpan.className = 'tab-title';
             newSpan.innerText = this.name;
-            input.replaceWith(newSpan);
-            this.manager.saveState(); // Save new name
+
+            if (input.parentNode) {
+                input.replaceWith(newSpan);
+            }
+
+            this.manager.saveState();
         };
 
         input.addEventListener('blur', saveName);
         input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') saveName();
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            }
         });
     }
 
