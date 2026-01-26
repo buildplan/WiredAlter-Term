@@ -98,13 +98,6 @@ class TerminalTab {
             allowTransparency: true,
             theme: themes[currentTheme]
         });
-        // Focus
-        this.term.textarea.addEventListener('focus', () => {
-            if (this.manager.activeTabId !== this.id) {
-                this.manager.setActiveTab(this.id);
-            }
-        });
-
 
         // 2. Load Addons
         this.fitAddon = new FitAddon.FitAddon();
@@ -140,7 +133,15 @@ class TerminalTab {
         this.term.open(this.element);
         this.fitAddon.fit();
 
-        // 5. Setup Input Handlers (Restored Logic)
+        if (this.term.textarea) {
+            this.term.textarea.addEventListener('focus', () => {
+                if (this.manager.activeTabId !== this.id) {
+                    this.manager.setActiveTab(this.id);
+                }
+            });
+        }
+
+        // 5. Setup Input Handlers
         this.term.onData((data) => {
             this.socket.emit('terminal:input', data);
         });
@@ -177,7 +178,7 @@ class TerminalTab {
 
         // Latency Pong
         this.socket.on('latency:pong', (timestamp) => {
-            if (!this.isActive()) return;
+            if (!this.isActive()) return; // Only show latency for active tab
 
             const latency = Date.now() - timestamp;
             signalElem.title = `Latency: ${latency}ms`;
@@ -247,7 +248,7 @@ class TerminalTab {
         if (this.socket.connected) {
             this.updateStatus('connected');
         } else if (this.socket.io.engine.readyState === 'opening') {
-            this.updateStatus('connecting'); // New State!
+            this.updateStatus('connecting');
         } else {
             this.updateStatus('disconnected');
         }
@@ -342,6 +343,7 @@ class TabManager {
         const tab = new TerminalTab(id, this);
         this.tabs.set(id, tab);
         this.setActiveTab(id);
+
         const termContainer = document.getElementById('terminals-container');
         if (termContainer.classList.contains('grid-mode')) {
             setTimeout(() => {
@@ -397,11 +399,9 @@ class TabManager {
         });
     }
 
-    // This replaces the global drag & drop logic
     setupFileUploads() {
         const dropOverlay = document.getElementById('drop-overlay');
 
-        // Prevent default drag behaviors on window
         window.addEventListener('dragenter', (e) => {
             e.preventDefault();
             dropOverlay.classList.add('active');
@@ -419,7 +419,7 @@ class TabManager {
             dropOverlay.classList.remove('active');
 
             const activeTab = this.getActiveTab();
-            if (!activeTab) return; // No terminal to upload to
+            if (!activeTab) return;
 
             const files = e.dataTransfer.files;
             if (files.length === 0) return;
@@ -432,7 +432,7 @@ class TabManager {
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 if (!res.ok) throw new Error('Upload failed');
-                activeTab.socket.emit('terminal:input', '\r'); // Refresh prompt
+                activeTab.socket.emit('terminal:input', '\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
                 activeTab.socket.emit('terminal:input', '\r');
