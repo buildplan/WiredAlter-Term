@@ -271,20 +271,27 @@ class TerminalTab {
     }
 
     destroy() {
+        try {
+            if (this.element) this.element.remove();
+            if (this.tabElement) this.tabElement.remove();
+        } catch(e) {
+            console.error("DOM Cleanup error", e);
+        }
         if (this.pingInterval) clearInterval(this.pingInterval);
         if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
-        if(this.socket) {
-            this.socket.disconnect();
-            if(this.socket.io) this.socket.io.close(); 
+        try {
+            if(this.socket) {
+                this.socket.disconnect();
+            }
+        } catch(e) {
+            console.warn("Socket cleanup error", e);
         }
         try {
             if(this.webglAddon) this.webglAddon.dispose();
             if(this.term) this.term.dispose();
         } catch (e) {
-            console.warn("Cleanup warning:", e);
+            console.warn("Terminal cleanup warning:", e);
         }
-        if (this.element) this.element.remove();
-        if (this.tabElement) this.tabElement.remove();
     }
 }
 
@@ -329,17 +336,20 @@ class TabManager {
     closeTab(id) {
         const tab = this.tabs.get(id);
         if (tab) {
-            tab.destroy();
             this.tabs.delete(id);
-
             if (this.activeTabId === id) {
                 if (this.tabs.size > 0) {
-                    const nextId = this.tabs.keys().next().value;
+                    const nextId = Array.from(this.tabs.keys()).pop();
                     this.setActiveTab(nextId);
                 } else {
                     this.activeTabId = null;
-                    this.createTab(); // Auto-create if empty
+                    this.createTab();
                 }
+            }
+            try {
+                tab.destroy();
+            } catch (err) {
+                console.error("Failed to destroy tab cleanly:", err);
             }
         }
     }
