@@ -20,6 +20,8 @@
             }
         })();
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
 </head>
 <body>
     <div class="container">
@@ -49,7 +51,20 @@
             </div>
         </div>
 
-        <div id="terminal"></div>
+        <div class="terminal-workspace">
+            <div class="tabs-header">
+                <div id="tabs-list" class="tabs-list">
+                    </div>
+                <button id="new-tab-btn" class="new-tab-btn" title="New Terminal (Ctrl+Alt+T)">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
+                        <path stroke-width="2" d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="terminals-container" class="terminals-container">
+                </div>
+        </div>
 
         <div id="drop-overlay" class="drop-overlay hidden">
             <div class="drop-message">

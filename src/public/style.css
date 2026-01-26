@@ -94,6 +94,109 @@ body {
     overflow: hidden;
 }
 
+/* Tab Bar Container */
+.tabs-header {
+    display: flex;
+    align-items: center;
+    background: #1e1e1e; /* Darker than terminal */
+    border-bottom: 1px solid #333;
+    height: 36px;
+    padding: 0 4px;
+    user-select: none;
+}
+
+/* Individual Tab */
+.tab {
+    display: flex;
+    align-items: center;
+    max-width: 200px;
+    min-width: 120px;
+    height: 28px;
+    background: #2d2d2d;
+    color: #888;
+    margin-right: 2px;
+    padding: 0 10px;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.1s;
+    border: 1px solid transparent;
+}
+
+.tab:hover { background: #383838; }
+
+.tab.active {
+    background: #000000; /* Matches terminal bg */
+    color: #fff;
+    border-top: 1px solid #444;
+    border-left: 1px solid #444;
+    border-right: 1px solid #444;
+    position: relative;
+    top: 1px; /* Blends with terminal container */
+    z-index: 10;
+}
+
+/* Tab Content */
+.tab-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Close Button (x) */
+.tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    opacity: 0.6;
+    font-size: 10px;
+}
+.tab-close:hover {
+    background: #cc4444;
+    color: white;
+    opacity: 1;
+}
+
+/* New Tab Button */
+.new-tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+.new-tab-btn:hover { background: #333; color: #fff; }
+
+/* Workspace Area */
+.terminals-container {
+    position: relative;
+    flex: 1;
+    height: calc(100vh - 36px); /* Subtract tab height */
+    overflow: hidden;
+    background: #000;
+}
+
+.terminal-instance {
+    display: none; /* Hidden by default */
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.terminal-instance.active {
+    display: block;
+}
+
 /* Common Button Styles */
 .icon-btn {
     background-color: var(--btn-bg);
