@@ -424,14 +424,39 @@ class TabManager {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("⏳ Starting App...");
 
-    // 1. Wait for fonts BEFORE opening any terminal
+    // Wait for fonts BEFORE opening any terminal
     await waitForFonts();
 
-    // 2. Initialize Manager
+    // --- GRID MODE TOGGLE ---
+    const gridBtn = document.getElementById('grid-mode-btn');
+    const termContainer = document.getElementById('terminals-container');
+    if (gridBtn) {
+        gridBtn.addEventListener('click', () => {
+            const isGrid = termContainer.classList.toggle('grid-mode');
+            gridBtn.style.color = isGrid ? '#7ee787' : 'inherit';
+            if (window.tabManager) {
+                window.tabManager.tabs.forEach(tab => {
+                    setTimeout(() => {
+                        tab.fitAddon.fit();
+                        if (tab.socket && tab.socket.connected) {
+                            tab.socket.emit('terminal:resize', {
+                                cols: tab.term.cols,
+                                rows: tab.term.rows
+                            });
+                        }
+                    }, 50);
+                });
+                const active = window.tabManager.getActiveTab();
+                if (active) active.term.focus();
+            }
+        });
+    }
+
+    // Initialize
     window.tabManager = new TabManager();
     window.tabManager.createTab(); // Open the first tab
 
-    // 3. Logout Handler
+    // Logout Handler
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
