@@ -405,7 +405,7 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
     grid-auto-rows: 1fr;
     gap: 4px;
-    background: #333; /* Border color between grids */
+    background: var(--border-color);
     padding: 4px;
 }
 
