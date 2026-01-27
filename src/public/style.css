@@ -191,6 +191,23 @@ body {
     opacity: 1;
 }
 
+.rename-input {
+    width: 80px;
+    background: var(--bg-container);
+    color: var(--text-main);
+    border: 1px solid var(--text-title);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    z-index: 20;
+}
+
+.rename-input:focus {
+    box-shadow: 0 0 4px var(--text-title);
+}
+
 /* New Tab Button */
 .new-tab-btn {
     background: transparent;
@@ -210,7 +227,7 @@ body {
     flex: 1;
     height: calc(100vh - 36px); /* Subtract tab height */
     overflow: hidden;
-    background: #000;
+    background: var(--bg-body);
 }
 
 .terminal-instance {

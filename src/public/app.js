@@ -69,14 +69,18 @@ async function waitForFonts() {
     }
 }
 
-// TAB Class
+// --- TERMINAL TAB CLASS ---
 class TerminalTab {
-    constructor(id, manager) {
+    constructor(id, manager, name = null, savedContent = '') {
         this.id = id;
         this.manager = manager;
+        this.name = name || `Terminal ${id}`;
+        this.savedContent = savedContent; // Content to restore
+
         this.socket = null;
         this.term = null;
         this.fitAddon = null;
+        this.serializeAddon = null;
         this.webglAddon = null;
         this.element = null;
         this.tabElement = null;
@@ -96,12 +100,17 @@ class TerminalTab {
             fontWeight: 'normal',
             fontWeightBold: 'bold',
             allowTransparency: true,
-            theme: themes[currentTheme]
+            theme: themes[currentTheme],
+            scrollback: 5000 // Remember more lines for persistence
         });
 
         // 2. Load Addons
         this.fitAddon = new FitAddon.FitAddon();
         this.term.loadAddon(this.fitAddon);
+
+        // Serialize Addon for saving state
+        this.serializeAddon = new SerializeAddon.SerializeAddon();
+        this.term.loadAddon(this.serializeAddon);
 
         // WebLinks (Clickable URLs)
         try {
@@ -133,6 +142,13 @@ class TerminalTab {
         this.term.open(this.element);
         this.fitAddon.fit();
 
+        // Restore content if it exists (Visual Persistence)
+        if (this.savedContent) {
+            this.term.write(this.savedContent);
+            this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
+        }
+
+        // Listen for focus to update active tab
         if (this.term.textarea) {
             this.term.textarea.addEventListener('focus', () => {
                 if (this.manager.activeTabId !== this.id) {
@@ -144,6 +160,8 @@ class TerminalTab {
         // 5. Setup Input Handlers
         this.term.onData((data) => {
             this.socket.emit('terminal:input', data);
+            // Save state on input
+            this.manager.saveState();
         });
 
         // Initial Resize Request
@@ -157,7 +175,9 @@ class TerminalTab {
     }
 
     setupSocketEvents() {
-        this.socket.on('terminal:output', (data) => this.term.write(data));
+        this.socket.on('terminal:output', (data) => {
+            this.term.write(data);
+        });
 
         this.socket.on('connect', () => {
             if(this.isActive()) {
@@ -209,7 +229,7 @@ class TerminalTab {
         this.tabElement = document.createElement('div');
         this.tabElement.className = 'tab';
         this.tabElement.innerHTML = `
-            <span class="tab-title">Terminal ${this.id}</span>
+            <span class="tab-title">${this.name}</span>
             <span class="tab-close">✕</span>
         `;
 
@@ -220,6 +240,11 @@ class TerminalTab {
             }
         });
 
+        // Double Click to Rename
+        this.tabElement.addEventListener('dblclick', () => {
+            this.startRenaming();
+        });
+
         // Close Click
         this.tabElement.querySelector('.tab-close').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -227,6 +252,50 @@ class TerminalTab {
         });
 
         document.getElementById('tabs-list').appendChild(this.tabElement);
+    }
+
+    startRenaming() {
+        const titleSpan = this.tabElement.querySelector('.tab-title');
+        const currentName = titleSpan.innerText;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'rename-input';
+
+        titleSpan.replaceWith(input);
+        input.focus();
+        input.select();
+
+        let isSaving = false;
+
+        const saveName = () => {
+            if (isSaving) return;
+            isSaving = true;
+
+            this.name = input.value || currentName;
+            const newSpan = document.createElement('span');
+            newSpan.className = 'tab-title';
+            newSpan.innerText = this.name;
+
+            if (input.parentNode) {
+                input.replaceWith(newSpan);
+            }
+
+            this.manager.saveState();
+        };
+
+        input.addEventListener('blur', saveName);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            }
+        });
+    }
+
+    getContent() {
+        return this.serializeAddon ? this.serializeAddon.serialize() : '';
     }
 
     isActive() {
@@ -324,39 +393,95 @@ class TabManager {
 
         document.getElementById('new-tab-btn').addEventListener('click', () => {
             this.createTab();
+            this.saveState();
         });
 
         // Initialize Drag and Drop for Tabs (SortableJS)
         if(window.Sortable) {
             new Sortable(document.getElementById('tabs-list'), {
                 animation: 150,
-                ghostClass: 'tab-ghost'
+                ghostClass: 'tab-ghost',
+                onEnd: () => this.saveState()
             });
         }
 
         // Initialize Global File Upload Handling
         this.setupFileUploads();
+
+        // Restore State on Boot
+        this.restoreState();
+
+        // Auto-save periodically
+        setInterval(() => this.saveState(), 5000);
     }
 
-    createTab() {
+    createTab(name = null, content = '') {
         const id = this.nextId++;
-        const tab = new TerminalTab(id, this);
+        const tab = new TerminalTab(id, this, name, content);
         this.tabs.set(id, tab);
         this.setActiveTab(id);
 
         const termContainer = document.getElementById('terminals-container');
         if (termContainer.classList.contains('grid-mode')) {
             setTimeout(() => {
-                this.tabs.forEach(t => {
-                    t.fitAddon.fit();
-                    if(t.socket && t.socket.connected) {
-                        t.socket.emit('terminal:resize', {
-                            cols: t.term.cols,
-                            rows: t.term.rows
-                        });
-                    }
-                });
+                this.tabs.forEach(t => t.resize());
             }, 100);
+        }
+        return tab;
+    }
+
+    saveState() {
+        const state = {
+            activeId: this.activeTabId,
+            nextId: this.nextId,
+            isGridMode: document.getElementById('terminals-container').classList.contains('grid-mode'),
+            tabs: []
+        };
+
+        const tabElements = document.querySelectorAll('.tab');
+        tabElements.forEach(el => {
+            this.tabs.forEach(t => {
+                if (t.tabElement === el) {
+                    state.tabs.push({
+                        id: t.id,
+                        name: t.name,
+                        content: t.getContent()
+                    });
+                }
+            });
+        });
+
+        localStorage.setItem('wiredterm-state', JSON.stringify(state));
+    }
+
+    restoreState() {
+        try {
+            const raw = localStorage.getItem('wiredterm-state');
+            if (!raw) {
+                this.createTab();
+                return;
+            }
+
+            const state = JSON.parse(raw);
+
+            // Restore Grid Mode
+            if (state.isGridMode) {
+                document.getElementById('terminals-container').classList.add('grid-mode');
+                document.getElementById('grid-mode-btn').style.color = '#7ee787';
+            }
+
+            // Restore Tabs
+            if (state.tabs && state.tabs.length > 0) {
+                state.tabs.forEach(t => {
+                    this.createTab(t.name, t.content);
+                });
+            } else {
+                this.createTab();
+            }
+
+        } catch (e) {
+            console.error("Failed to restore state:", e);
+            this.createTab();
         }
     }
 
@@ -366,6 +491,7 @@ class TabManager {
         }
         this.activeTabId = id;
         this.tabs.get(id).activate();
+        this.saveState();
     }
 
     closeTab(id) {
@@ -386,6 +512,7 @@ class TabManager {
             } catch (err) {
                 console.error("Failed to destroy tab cleanly:", err);
             }
+            this.saveState();
         }
     }
 
@@ -469,13 +596,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 const active = window.tabManager.getActiveTab();
                 if (active) active.term.focus();
+                window.tabManager.saveState();
             }
         });
     }
 
     // Initialize
     window.tabManager = new TabManager();
-    window.tabManager.createTab(); // Open the first tab
 
     // Logout Handler
     if (logoutBtn) {
