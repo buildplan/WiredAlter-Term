@@ -6,10 +6,10 @@
     <title>WiredTerm</title>
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💻</text></svg>">
-
+    
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
     <link rel="stylesheet" href="style.css?v=3">
 
     <script>
@@ -20,17 +20,35 @@
             }
         })();
     </script>
+
     <script 
-        src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js" 
-        integrity="sha384-eeLEhtwdMwD3X9y+8P3Cn7Idl/M+w8H4uZqkgD/2eJVkWIN1yKzEj6XegJ9dL3q0" 
+        src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"
+        integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
     <script 
-        src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js" 
-        integrity="sha384-U4fBROT3kCM582gaYiNaOSQiJbXPzd9SfR1598Y7yeGSYVBzikXrNg0XyuU+mOnl" 
+        src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"
+        integrity="sha384-xjfWUeCWdMtvpAb/SmM6lMzS6pQGcQa0loOl1d97j6Odw0vjK9nW3+dTb/bn/mwH"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
     <script 
-        src="https://cdn.jsdelivr.net/npm/@xterm/addon-serialize@0.13.0/lib/addon-serialize.js" 
-        integrity="sha384-LE8irhnMZbxP5bqJs4QETh0R1y0V6akb5+9Vwi5qb1dQoz7Ii3JfguJSHMDb+62a" 
+        src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"
+        integrity="sha384-dpjGwSSISUTz2taP54Bor7qkyMR20sSO9oe11UVYnGs2/YdUBf7HW30XKQx9PCzn"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
+    <script 
+        src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"
+        integrity="sha384-iAAiqSZrWZz/YKZSTKOPNaRhVOg9JY14avg2EWEpYNnUsrnATA+Sg8pV7mak84/G"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
+    <script 
+        src="https://cdn.jsdelivr.net/npm/xterm-addon-serialize@0.11.0/lib/xterm-addon-serialize.min.js"
+        integrity="sha384-ElcadQlFU1BXhmhxAY6B7CvySGUEhtT9mrFJpguG6MN0Zy4KOvsJ3+6gMyTO2cr5"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        
+    <script 
+        src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.min.js"
+        integrity="sha384-LjE7pQ+MvZLxKNFYaNqxXiKIg0LASkwKbvcMtgxwNfSSDVjJ4tgEe0p56hzikjhs"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
@@ -54,7 +72,6 @@
                     <span id="icon-sun">☀️</span>
                     <span id="icon-moon" style="display:none;">🌙</span>
                 </button>
-                
                 <button id="logout-btn" class="logout-btn icon-btn">
                     <span class="btn-text">Logout</span> ⏻
                 </button>
@@ -69,16 +86,13 @@
                         <path stroke-width="2" d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
                     </svg>
                 </button>
-
                 <button id="new-tab-btn" class="new-tab-btn" title="New Terminal (Ctrl+Alt+T)">
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
                         <path stroke-width="2" d="M12 5v14M5 12h14"/>
                     </svg>
                 </button>
             </div>
-
-            <div id="terminals-container" class="terminals-container">
-                </div>
+            <div id="terminals-container" class="terminals-container"></div>
         </div>
 
         <div id="drop-overlay" class="drop-overlay hidden">
@@ -90,10 +104,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
-
-    <script type="module" src="app.js"></script>
+    
+    <script src="app.js"></script>
 </body>
 </html>
