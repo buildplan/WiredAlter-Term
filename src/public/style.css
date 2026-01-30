@@ -87,6 +87,7 @@ body {
 }
 
 .header {
+    flex-shrink: 0;
     background: var(--bg-header);
     padding: 10px 15px;
     border-bottom: 1px solid var(--border-color);
@@ -97,12 +98,21 @@ body {
     transition: background-color 0.3s, border-color 0.3s;
 }
 
+.terminal-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+}
+
 .title { font-weight: bold; color: var(--text-title); }
 .title-details { color: var(--text-muted); font-weight: normal; font-size: 0.9em;}
 
 .controls { display: flex; gap: 10px; align-items: center; }
 
-/* Terminal Container */
+/* Legacy Terminal Container */
 #terminal { 
     flex: 1; 
     padding: 10px; 
@@ -113,6 +123,7 @@ body {
 
 /* Tab Bar Container */
 .tabs-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     background: var(--tab-bar-bg);
@@ -223,24 +234,31 @@ body {
 
 /* Workspace Area */
 .terminals-container {
-    position: relative;
     flex: 1;
-    height: calc(100vh - 36px); /* Subtract tab height */
+    height: auto;
+    width: 100%;
+    position: relative;
     overflow: hidden;
     background: var(--bg-body);
 }
 
 .terminal-instance {
-    display: none; /* Hidden by default */
+    display: none; 
     width: 100%;
     height: 100%;
     position: absolute;
     top: 0;
     left: 0;
+    overflow: hidden;
 }
 
 .terminal-instance.active {
     display: block;
+}
+
+/* Optional: Slim Scrollbar */
+.xterm-viewport {
+    scrollbar-width: thin;
 }
 
 /* Common Button Styles */
@@ -379,10 +397,10 @@ html.light .cursor { color: #0969da; }
 .bar-3 { height: 100%; }
 
 /* Classes applied via JS based on ping */
-.signal-good .bar { background-color: #7ee787; } /* Green */
-.signal-fair .bar { background-color: #e0af68; } /* Yellow */
-.signal-fair .bar-3 { background-color: var(--border-color); } /* Dim the top bar */
-.signal-poor .bar { background-color: #ff5555; } /* Red */
+.signal-good .bar { background-color: #7ee787; }
+.signal-fair .bar { background-color: #e0af68; }
+.signal-fair .bar-3 { background-color: var(--border-color); }
+.signal-poor .bar { background-color: #ff5555; }
 .signal-poor .bar-2, .signal-poor .bar-3 { background-color: var(--border-color); }
 
 /* --- DRAG & DROP OVERLAY --- */
@@ -394,7 +412,7 @@ html.light .cursor { color: #0969da; }
     display: flex;
     justify-content: center;
     align-items: center;
-    pointer-events: none; /* Let events pass through until active */
+    pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s;
 }
@@ -416,7 +434,7 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     background: var(--bg-container);
 }
 
-/* --- GRID MODE (SIDE-BY-SIDE) --- */
+/* --- GRID MODE --- */
 .terminals-container.grid-mode {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
