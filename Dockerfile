@@ -37,9 +37,9 @@ RUN apt-get update && \
     # Install asciinema
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
-        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-x86_64-unknown-linux-gnu"; \
+        URL="https://github.com/asciinema/asciinema/releases/download/v3.1.0/asciinema-x86_64-unknown-linux-gnu"; \
     elif [ "$ARCH" = "aarch64" ]; then \
-        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-aarch64-unknown-linux-gnu"; \
+        URL="https://github.com/asciinema/asciinema/releases/download/v3.1.0/asciinema-aarch64-unknown-linux-gnu"; \
     else \
         echo "❌ Unsupported architecture: $ARCH" && exit 1; \
     fi && \
