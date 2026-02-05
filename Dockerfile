@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25-trixie-slim
+FROM node:25.6.0-trixie-slim
 
 # Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,14 +14,16 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.2.1-cli /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
-RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+# renovate: datasource=github-releases depName=starship/starship
+ARG STARSHIP_VERSION=v1.24.2
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
 
 # Install Tailscale
-COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale && \
     mkdir -p /var/run/tailscale && \
     chown node:node /var/run/tailscale
@@ -29,6 +31,8 @@ RUN mkdir -p /var/lib/tailscale && \
 WORKDIR /app
 COPY package.json .
 
+# renovate: datasource=github-releases depName=asciinema/asciinema
+ARG ASCIINEMA_VERSION=v3.1.0
 # Install Compilers -> Build -> Clean NPM -> Remove Compilers
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ \
@@ -37,9 +41,9 @@ RUN apt-get update && \
     # Install asciinema
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
-        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-x86_64-unknown-linux-gnu"; \
+        URL="https://github.com/asciinema/asciinema/releases/download/${ASCIINEMA_VERSION}/asciinema-x86_64-unknown-linux-gnu"; \
     elif [ "$ARCH" = "aarch64" ]; then \
-        URL="https://github.com/asciinema/asciinema/releases/download/v3.0.1/asciinema-aarch64-unknown-linux-gnu"; \
+        URL="https://github.com/asciinema/asciinema/releases/download/${ASCIINEMA_VERSION}/asciinema-aarch64-unknown-linux-gnu"; \
     else \
         echo "❌ Unsupported architecture: $ARCH" && exit 1; \
     fi && \
@@ -55,11 +59,13 @@ COPY . .
 # Copy Config Defaults
 COPY config/ /usr/local/share/smart-term/defaults/
 
+# renovate: datasource=github-tags depName=ryanoasis/nerd-fonts
+ARG NERDFONT_VERSION=v3.4.0
 # Setup Seed Directories & Download Font
 RUN mkdir -p /usr/local/share/smart-term/fonts \
              /usr/local/share/smart-term/config && \
     curl -L -o /usr/local/share/smart-term/fonts/font.ttf \
-    "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
+    "https://github.com/ryanoasis/nerd-fonts/raw/${NERDFONT_VERSION}/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
 # Configure Shell & Permissions
 RUN mkdir -p /data && chown -R node:node /app /data /home/node
