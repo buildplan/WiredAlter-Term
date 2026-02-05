@@ -20,7 +20,9 @@
       "description": "Update Dockerfile ARGs (Starship, Asciinema, Fonts)",
       "fileMatch": ["^Dockerfile$"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+=(?<quote>[\"']?)(?<currentValue>.*?)\\k<quote>\\s"
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+=\"(?<currentValue>.*?)\"\\s",
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+='(?<currentValue>.*?)'\\s",
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+=(?<currentValue>[^\\s\"']+)\\s"
       ]
     },
     {
