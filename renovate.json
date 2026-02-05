@@ -3,6 +3,8 @@
   "extends": [
     "config:best-practices"
   ],
+  "pinDigests": false,
+  "rangeStrategy": "bump",
   "packageRules": [
     {
       "matchUpdateTypes": [
