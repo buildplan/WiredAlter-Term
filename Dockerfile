@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25-trixie-slim
+FROM node:25.6.0-trixie-slim
 
 # Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,8 +20,8 @@ COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
 
 # Install Tailscale
-COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale && \
     mkdir -p /var/run/tailscale && \
     chown node:node /var/run/tailscale
