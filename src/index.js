@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 import session from 'express-session';
-import sessionFileStore from 'session-file-store';
+import sessionFileStore from '@sequencemedia/session-file-store';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 
