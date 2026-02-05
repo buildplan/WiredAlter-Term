@@ -14,7 +14,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.2.1-cli /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
