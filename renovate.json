@@ -5,20 +5,29 @@
   ],
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
       "automerge": true
     },
     {
       "description": "Group all xterm related packages together",
-      "matchPackagePatterns": ["^xterm"],
-      "groupName": "xterm packages"
+      "groupName": "xterm packages",
+      "matchPackageNames": [
+        "/^xterm/"
+      ]
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update Dockerfile ARGs (Starship, Asciinema, Fonts)",
-      "fileMatch": ["^Dockerfile$"],
+      "managerFilePatterns": [
+        "/^Dockerfile$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+=\"(?<currentValue>.*?)\"\\s",
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+='(?<currentValue>.*?)'\\s",
@@ -28,7 +37,9 @@
     {
       "customType": "regex",
       "description": "Update CDN libraries in HTML",
-      "fileMatch": ["^index\\.html$"],
+      "managerFilePatterns": [
+        "/^index\\.html$/"
+      ],
       "matchStrings": [
         "cdn\\.jsdelivr\\.net\\/npm\\/(?<depName>[^@]+)@(?<currentValue>[^\\/]+)\\/"
       ],
