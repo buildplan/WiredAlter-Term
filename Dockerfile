@@ -54,6 +54,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     ln -s /usr/bin/batcat /usr/local/bin/bat
 
+RUN sed -i 's/^.*SendEnv LANG LC_.*$/#&/' /etc/ssh/ssh_config
+
 COPY . .
 
 # Copy Config Defaults
