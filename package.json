@@ -1,6 +1,6 @@
 {
   "name": "wiredalter-term",
-  "version": "0.3.0",
+  "version": "0.5",
   "description": "A self-hosted web terminal with persistent storage and file management.",
   "type": "module",
   "private": true,
