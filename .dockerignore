@@ -7,11 +7,16 @@ data
 data/
 .ssh
 
-# Metadata
+# Metadata and testing
 .git
 .gitignore
 README*
 renovate.json
+LICENCE
+test
+test/
+test_data
+test_data/
 
 # Docker & GitHub files
 Dockerfile
