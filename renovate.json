@@ -4,7 +4,7 @@
   "pinDigests": false,
   "rangeStrategy": "bump",
   "packageRules": [
-    { "matchUpdateTypes": ["pin","digest"], "enabled": false },
+    { "matchUpdateTypes": ["pin","digest","pinDigest"], "enabled": false },
     { "matchUpdateTypes": ["minor","patch"], "automerge": true },
     { "description": "Group all xterm related packages together", "groupName": "xterm packages", "matchPackageNames": ["/^xterm/"] }
   ],
