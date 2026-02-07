@@ -98,3 +98,4 @@ jobs:
           repository-name: ${{ github.event.repository.name }}
           delete-untagged: true
           keep-at-most: 10
+        continue-on-error: true
