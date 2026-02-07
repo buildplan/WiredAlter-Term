@@ -249,12 +249,12 @@ io.on('connection', (socket) => {
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
     socket.on('terminal:input', (data) => ptyProcess.write(data));
     socket.on('terminal:resize', ({ cols, rows }) => {
-        try { ptyProcess.resize(cols, rows); } catch (err) {}
-    });
+        const safeCols = Math.max(1, Math.min(1000, cols || 80));
+        const safeRows = Math.max(1, Math.min(1000, rows || 30));
+        try { ptyProcess.resize(safeCols, safeRows); }
+            catch (err) { console.warn('Resize failed:', err.message); }});
     socket.on('disconnect', () => ptyProcess.kill());
-    socket.on('latency:ping', (timestamp) => {
-        socket.emit('latency:pong', timestamp);
-    });
+    socket.on('latency:ping', (timestamp) => { socket.emit('latency:pong', timestamp); });
 });
 
 // --- EXPORT FOR TESTING ---

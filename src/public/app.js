@@ -32,7 +32,6 @@ function updateThemeIcons(isLight) {
         iconSun.style.display = 'inline';
         iconMoon.style.display = 'none';
     }
-    // Update body/html classes
     if (isLight) document.documentElement.classList.add('light');
     else document.documentElement.classList.remove('light');
 }
@@ -46,7 +45,6 @@ themeBtn.addEventListener('click', () => {
     localStorage.setItem('wired-term-theme', currentTheme);
     updateThemeIcons(isLight);
 
-    // Update all open tabs immediately
     if (window.tabManager) {
         window.tabManager.applyThemeToAll(themes[currentTheme]);
     }
@@ -75,7 +73,7 @@ class TerminalTab {
         this.id = id;
         this.manager = manager;
         this.name = name || `Terminal ${id}`;
-        this.savedContent = savedContent; // Content to restore
+        this.savedContent = savedContent;
 
         this.socket = null;
         this.term = null;
@@ -85,6 +83,7 @@ class TerminalTab {
         this.element = null;
         this.tabElement = null;
         this.pingInterval = null;
+        this.resizeObserver = null;
 
         this.init();
     }
@@ -92,7 +91,6 @@ class TerminalTab {
     init() {
         this.createElements();
 
-        // 1. Initialize XTerm
         this.term = new Terminal({
             cursorBlink: true,
             fontFamily: '"TermFont", monospace',
@@ -101,23 +99,19 @@ class TerminalTab {
             fontWeightBold: 'bold',
             allowTransparency: true,
             theme: themes[currentTheme],
-            scrollback: 5000 // Remember more lines for persistence
+            scrollback: 5000
         });
 
-        // 2. Load Addons
         this.fitAddon = new FitAddon.FitAddon();
         this.term.loadAddon(this.fitAddon);
 
-        // Serialize Addon for saving state
         this.serializeAddon = new SerializeAddon.SerializeAddon();
         this.term.loadAddon(this.serializeAddon);
 
-        // WebLinks (Clickable URLs)
         try {
             this.term.loadAddon(new WebLinksAddon.WebLinksAddon());
         } catch (e) { console.warn("WebLinks addon missing"); }
 
-        // WebGL (Performance)
         try {
             this.webglAddon = new WebglAddon.WebglAddon();
             this.term.loadAddon(this.webglAddon);
@@ -127,7 +121,6 @@ class TerminalTab {
             console.warn(`[Tab ${this.id}] ⚠️ WebGL failed, falling back to Canvas`, e);
         }
 
-        // 3. Connect Socket (New connection per tab)
         this.socket = io({
             forceNew: true,
             multiplex: false,
@@ -138,17 +131,14 @@ class TerminalTab {
 
         this.setupSocketEvents();
 
-        // 4. Attach to DOM & Fit
         this.term.open(this.element);
         this.fitAddon.fit();
 
-        // Restore content if it exists (Visual Persistence)
         if (this.savedContent) {
             this.term.write(this.savedContent);
             this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
         }
 
-        // Listen for focus to update active tab
         if (this.term.textarea) {
             this.term.textarea.addEventListener('focus', () => {
                 if (this.manager.activeTabId !== this.id) {
@@ -157,21 +147,18 @@ class TerminalTab {
             });
         }
 
-        // 5. Setup Input Handlers
         this.term.onData((data) => {
             this.socket.emit('terminal:input', data);
-            // Save state on input
             this.manager.saveState();
         });
 
         // Initial Resize Request
         setTimeout(() => this.resize(), 50);
 
-        // Global Resize Listener (Specific to this instance)
-        this.resizeListener = () => {
-            if(this.isActive()) this.resize();
-        };
-        window.addEventListener('resize', this.resizeListener);
+        this.resizeObserver = new ResizeObserver(() => {
+            if (this.isActive()) this.resize();
+        });
+        this.resizeObserver.observe(document.getElementById('terminals-container'));
     }
 
     setupSocketEvents() {
@@ -196,10 +183,8 @@ class TerminalTab {
             if(this.isActive()) this.updateStatus('error');
         });
 
-        // Latency Pong
         this.socket.on('latency:pong', (timestamp) => {
-            if (!this.isActive()) return; // Only show latency for active tab
-
+            if (!this.isActive()) return;
             const latency = Date.now() - timestamp;
             signalElem.title = `Latency: ${latency}ms`;
             signalElem.className = 'signal-bars';
@@ -219,13 +204,11 @@ class TerminalTab {
     }
 
     createElements() {
-        // Create Terminal Container
         this.element = document.createElement('div');
         this.element.className = 'terminal-instance';
         this.element.id = `term-${this.id}`;
         document.getElementById('terminals-container').appendChild(this.element);
 
-        // Create Tab UI
         this.tabElement = document.createElement('div');
         this.tabElement.className = 'tab';
         this.tabElement.innerHTML = `
@@ -233,19 +216,16 @@ class TerminalTab {
             <span class="tab-close">✕</span>
         `;
 
-        // Tab Click
         this.tabElement.addEventListener('click', (e) => {
             if(!e.target.classList.contains('tab-close')) {
                 this.manager.setActiveTab(this.id);
             }
         });
 
-        // Double Click to Rename
         this.tabElement.addEventListener('dblclick', () => {
             this.startRenaming();
         });
 
-        // Close Click
         this.tabElement.querySelector('.tab-close').addEventListener('click', (e) => {
             e.stopPropagation();
             this.manager.closeTab(this.id);
@@ -359,6 +339,7 @@ class TerminalTab {
         }
     }
 
+    // 3. CORRECTED DESTROY METHOD
     destroy() {
         try {
             if (this.element) this.element.remove();
@@ -367,7 +348,7 @@ class TerminalTab {
             console.error("DOM Cleanup error", e);
         }
         if (this.pingInterval) clearInterval(this.pingInterval);
-        if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
+        if (this.resizeObserver) { this.resizeObserver.disconnect(); }
         try {
             if(this.socket) {
                 this.socket.disconnect();
@@ -396,7 +377,6 @@ class TabManager {
             this.saveState();
         });
 
-        // Initialize Drag and Drop for Tabs (SortableJS)
         if(window.Sortable) {
             new Sortable(document.getElementById('tabs-list'), {
                 animation: 150,
@@ -405,13 +385,8 @@ class TabManager {
             });
         }
 
-        // Initialize Global File Upload Handling
         this.setupFileUploads();
-
-        // Restore State on Boot
         this.restoreState();
-
-        // Auto-save periodically
         setInterval(() => this.saveState(), 5000);
     }
 
@@ -464,13 +439,11 @@ class TabManager {
 
             const state = JSON.parse(raw);
 
-            // Restore Grid Mode
             if (state.isGridMode) {
                 document.getElementById('terminals-container').classList.add('grid-mode');
                 document.getElementById('grid-mode-btn').style.color = '#7ee787';
             }
 
-            // Restore Tabs
             if (state.tabs && state.tabs.length > 0) {
                 state.tabs.forEach(t => {
                     this.createTab(t.name, t.content);
@@ -572,10 +545,8 @@ class TabManager {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("⏳ Starting App...");
 
-    // Wait for fonts BEFORE opening any terminal
     await waitForFonts();
 
-    // --- GRID MODE TOGGLE ---
     const gridBtn = document.getElementById('grid-mode-btn');
     const termContainer = document.getElementById('terminals-container');
     if (gridBtn) {
@@ -601,10 +572,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Initialize
     window.tabManager = new TabManager();
 
-    // Logout Handler
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
