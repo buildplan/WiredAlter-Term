@@ -54,6 +54,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     ln -s /usr/bin/batcat /usr/local/bin/bat
 
+# Prevent SSH from leaking local locale settings to remote servers
 RUN sed -i 's/^.*SendEnv LANG LC_.*$/#&/' /etc/ssh/ssh_config
 
 COPY . .
@@ -79,5 +80,10 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Metadata
 ENV HOME=/home/node
 EXPOSE 3939
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3939/ || exit 1
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "src/index.js"]
