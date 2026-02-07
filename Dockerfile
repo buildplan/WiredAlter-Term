@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.6.0-trixie-slim
+FROM node:25.6.0-trixie-slim@sha256:e898713be2886887a8f83c98f450585185a357558ce649ff8c88db25ea0d1938
 
 # Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,7 +14,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:29.2.1-cli /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.2.1-cli@sha256:1d6d751f1d68d1a5142c23c730ef5ecc976a8e050fa08c3cdb09f7e2e54a4439 /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
@@ -22,8 +22,8 @@ ARG STARSHIP_VERSION=v1.24.2
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
 
 # Install Tailscale
-COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=docker.io/tailscale/tailscale:v1.94.1 /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=docker.io/tailscale/tailscale:v1.94.1@sha256:21df0b5a84efa35c0a507f4dd2340e1b1295683634a28968707354d5bd991d9c /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:v1.94.1@sha256:21df0b5a84efa35c0a507f4dd2340e1b1295683634a28968707354d5bd991d9c /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale && \
     mkdir -p /var/run/tailscale && \
     chown node:node /var/run/tailscale
