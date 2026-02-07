@@ -1,40 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices"
-  ],
+  "extends": ["config:best-practices"],
   "pinDigests": false,
   "rangeStrategy": "bump",
   "packageRules": [
-    {
-      "matchUpdateTypes": [
-        "pin",
-        "digest"
-      ],
-      "enabled": false
-    },
-    {
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "automerge": true
-    },
-    {
-      "description": "Group all xterm related packages together",
-      "groupName": "xterm packages",
-      "matchPackageNames": [
-        "/^xterm/"
-      ]
-    }
+    { "matchUpdateTypes": ["pin","digest"], "enabled": false },
+    { "matchUpdateTypes": ["minor","patch"], "automerge": true },
+    { "description": "Group all xterm related packages together", "groupName": "xterm packages", "matchPackageNames": ["/^xterm/"] }
   ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update Dockerfile ARGs (Starship, Asciinema, Fonts)",
-      "managerFilePatterns": [
-        "/^Dockerfile$/"
-      ],
+      "managerFilePatterns": ["/^Dockerfile$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+=\"(?<currentValue>.*?)\"\\s",
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)(?: versioning=(?<versioning>.*?))?\\s(?:ENV|ARG)\\s+\\w+='(?<currentValue>.*?)'\\s",
@@ -44,12 +22,8 @@
     {
       "customType": "regex",
       "description": "Update CDN libraries in HTML",
-      "managerFilePatterns": [
-        "/^index\\.html$/"
-      ],
-      "matchStrings": [
-        "cdn\\.jsdelivr\\.net\\/npm\\/(?<depName>[^@]+)@(?<currentValue>[^\\/]+)\\/"
-      ],
+      "managerFilePatterns": ["/^index\\.html$/"],
+      "matchStrings": ["cdn\\.jsdelivr\\.net\\/npm\\/(?<depName>[^@]+)@(?<currentValue>[^\\/]+)\\/"],
       "datasourceTemplate": "npm"
     }
   ]
