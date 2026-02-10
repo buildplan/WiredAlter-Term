@@ -20,7 +20,7 @@ let mouseReportingEnabled = true;
 const statusElem = document.getElementById('connection-status');
 const signalElem = document.getElementById('signal-strength');
 const themeBtn = document.getElementById('theme-btn');
-const mouseBtn = document.getElementById('mouse-mode-btn'); 
+const mouseBtn = document.getElementById('mouse-mode-btn');
 const iconMouseOn = document.getElementById('icon-mouse-on');
 const iconMouseOff = document.getElementById('icon-mouse-off');
 const iconSun = document.getElementById('icon-sun');
@@ -54,18 +54,18 @@ themeBtn.addEventListener('click', () => {
     }
 });
 
-// Mouse mode
+// Mouse toggle
 function updateMouseIcon() {
     if (mouseReportingEnabled) {
         iconMouseOn.style.display = 'inline';
         iconMouseOff.style.display = 'none';
         mouseBtn.title = "Mouse Reporting: ON (Tmux handles scroll/click). Click to disable for copying.";
-        mouseBtn.style.color = '#7ee787';
+        mouseBtn.style.cssText = "color: #7ee787 !important; border-color: #7ee787 !important;";
     } else {
         iconMouseOn.style.display = 'none';
         iconMouseOff.style.display = 'inline';
         mouseBtn.title = "Mouse Reporting: OFF (Browser handles select/copy/paste).";
-        mouseBtn.style.color = '#e0af68';
+        mouseBtn.style.cssText = "color: #e0af68 !important; border-color: #e0af68 !important;";
     }
 }
 
@@ -77,6 +77,7 @@ if (mouseBtn) {
         if (window.tabManager) {
             window.tabManager.tabs.forEach(tab => {
                 tab.term.options.allowMouseReporting = mouseReportingEnabled;
+                tab.term.clearSelection();
             });
             const active = window.tabManager.getActiveTab();
             if (active) active.term.focus();
