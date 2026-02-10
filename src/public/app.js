@@ -16,9 +16,13 @@ const themes = {
 
 // Global State
 let currentTheme = localStorage.getItem('wired-term-theme') === 'light' ? 'light' : 'dark';
+let mouseReportingEnabled = true;
 const statusElem = document.getElementById('connection-status');
 const signalElem = document.getElementById('signal-strength');
 const themeBtn = document.getElementById('theme-btn');
+const mouseBtn = document.getElementById('mouse-mode-btn'); 
+const iconMouseOn = document.getElementById('icon-mouse-on');
+const iconMouseOff = document.getElementById('icon-mouse-off');
 const iconSun = document.getElementById('icon-sun');
 const iconMoon = document.getElementById('icon-moon');
 const logoutBtn = document.getElementById('logout-btn');
@@ -49,6 +53,38 @@ themeBtn.addEventListener('click', () => {
         window.tabManager.applyThemeToAll(themes[currentTheme]);
     }
 });
+
+// Mouse mode
+function updateMouseIcon() {
+    if (mouseReportingEnabled) {
+        iconMouseOn.style.display = 'inline';
+        iconMouseOff.style.display = 'none';
+        mouseBtn.title = "Mouse Reporting: ON (Tmux handles scroll/click). Click to disable for copying.";
+        mouseBtn.style.color = '#7ee787';
+    } else {
+        iconMouseOn.style.display = 'none';
+        iconMouseOff.style.display = 'inline';
+        mouseBtn.title = "Mouse Reporting: OFF (Browser handles select/copy/paste).";
+        mouseBtn.style.color = '#e0af68';
+    }
+}
+
+if (mouseBtn) {
+    mouseBtn.addEventListener('click', () => {
+        mouseReportingEnabled = !mouseReportingEnabled;
+        updateMouseIcon();
+
+        if (window.tabManager) {
+            window.tabManager.tabs.forEach(tab => {
+                tab.term.options.allowMouseReporting = mouseReportingEnabled;
+            });
+            const active = window.tabManager.getActiveTab();
+            if (active) active.term.focus();
+        }
+    });
+}
+
+updateMouseIcon();
 
 // Font Loading (Global)
 async function waitForFonts() {
@@ -99,7 +135,8 @@ class TerminalTab {
             fontWeightBold: 'bold',
             allowTransparency: true,
             theme: themes[currentTheme],
-            scrollback: 5000
+            scrollback: 5000,
+            allowMouseReporting: mouseReportingEnabled
         });
 
         this.fitAddon = new FitAddon.FitAddon();
@@ -132,6 +169,9 @@ class TerminalTab {
         this.setupSocketEvents();
 
         this.term.open(this.element);
+        this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
+        this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
+        this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.fitAddon.fit();
 
         if (this.savedContent) {
@@ -580,4 +620,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = '/logout';
         });
     }
+
+    document.addEventListener('contextmenu', (event) => {
+        if (!mouseReportingEnabled) return;
+        if (event.shiftKey) return;
+        event.preventDefault();
+    });
 });
