@@ -226,6 +226,7 @@ const setupPersistence = () => {
     seedAndLink('.bashrc', false);
     seedAndLink('.bash_history', false);
     seedAndLink('.config/starship.toml', false, join(seedDir, 'config/starship.toml'));
+    seedAndLink('.tmux.conf', false, join(seedDir, 'config/tmux.conf'));
     seedAndLink('storage', true);
 
     if (!fs.existsSync('/data/sessions')) {
