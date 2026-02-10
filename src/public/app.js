@@ -16,6 +16,7 @@ const themes = {
 
 // Global State
 let currentTheme = localStorage.getItem('wired-term-theme') === 'light' ? 'light' : 'dark';
+let mouseReportingEnabled = true;
 const statusElem = document.getElementById('connection-status');
 const signalElem = document.getElementById('signal-strength');
 const themeBtn = document.getElementById('theme-btn');
