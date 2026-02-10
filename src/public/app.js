@@ -20,7 +20,7 @@ let mouseReportingEnabled = true;
 const statusElem = document.getElementById('connection-status');
 const signalElem = document.getElementById('signal-strength');
 const themeBtn = document.getElementById('theme-btn');
-const mouseBtn = document.getElementById('mouse-mode-btn'); 
+const mouseBtn = document.getElementById('mouse-mode-btn');
 const iconMouseOn = document.getElementById('icon-mouse-on');
 const iconMouseOff = document.getElementById('icon-mouse-off');
 const iconSun = document.getElementById('icon-sun');
@@ -60,7 +60,7 @@ function updateMouseIcon() {
         iconMouseOn.style.display = 'inline';
         iconMouseOff.style.display = 'none';
         mouseBtn.title = "Mouse Reporting: ON (Tmux handles scroll/click). Click to disable for copying.";
-        mouseBtn.style.cssText = "color: #7ee787 !important; border-color: #7ee787 !important;"; 
+        mouseBtn.style.cssText = "color: #7ee787 !important; border-color: #7ee787 !important;";
     } else {
         iconMouseOn.style.display = 'none';
         iconMouseOff.style.display = 'inline';
@@ -76,9 +76,9 @@ if (mouseBtn) {
 
         if (window.tabManager) {
             window.tabManager.tabs.forEach(tab => {
-                if (!mouseReportingEnabled) { tab.term.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l'); }
-                else { tab.term.write('\x1b[?1000h\x1b[?1002h\x1b[?1006h'); }
-            });
+                tab.term.options.allowMouseReporting = mouseReportingEnabled;
+                if (!mouseReportingEnabled) { tab.socket.emit('terminal:input', '\x1bc'); tab.term.clearSelection(); }
+                else { tab.socket.emit('terminal:input', '\x02:refresh-client\r'); }});
             const active = window.tabManager.getActiveTab();
             if (active) active.term.focus();
         }
