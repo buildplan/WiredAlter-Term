@@ -248,7 +248,8 @@ io.on('connection', (socket) => {
         env: { ...process.env, TERM: 'xterm-256color' }
     });
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
-    socket.on('terminal:input', (data) => ptyProcess.write(data));
+    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect();});
+    socket.on('terminal:input', (data) => { try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }});
     socket.on('terminal:resize', ({ cols, rows }) => {
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
