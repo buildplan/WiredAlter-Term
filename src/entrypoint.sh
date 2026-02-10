@@ -37,7 +37,7 @@ cp "$DEFAULTS_DIR/starship.default.toml" "$CONFIG_DIR/starship.toml"
 
 # tmux Config
 echo "🌱 Seeding default Tmux config..."
-cp "$DEFAULTS_DIR/tmux.conf" "$SEED_CONFIG_DIR/tmux.conf"
+cp "$DEFAULTS_DIR/tmux.conf" "$CONFIG_DIR/tmux.conf"
 
 # .bashrc Injection
 if ! grep -q "Tools Init" "$USER_BASHRC"; then
