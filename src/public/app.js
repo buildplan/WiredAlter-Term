@@ -77,8 +77,8 @@ if (mouseBtn) {
         if (window.tabManager) {
             window.tabManager.tabs.forEach(tab => {
                 tab.term.options.allowMouseReporting = mouseReportingEnabled;
-                if (!mouseReportingEnabled) { tab.socket.emit('terminal:input', '\x1bc'); tab.term.clearSelection(); }
-                else { tab.socket.emit('terminal:input', '\x02:refresh-client\r'); }});
+                tab.term.clearSelection();
+            });
             const active = window.tabManager.getActiveTab();
             if (active) active.term.focus();
         }
