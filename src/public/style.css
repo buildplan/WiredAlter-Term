@@ -287,9 +287,11 @@ body {
     color: var(--btn-text);
     font-size: 0.8rem;
     padding: 4px 10px;
+    gap: 6px;
 }
 .logout-btn:hover {
     color: #ff0000;
+    border-color: #ff0000;
 }
 
 /* LOGIN PAGE */

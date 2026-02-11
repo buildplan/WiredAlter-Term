@@ -175,6 +175,7 @@ class TerminalTab {
         this.setupSocketEvents();
 
         this.term.open(this.element);
+        if (this.term.textarea) { this.term.textarea.name = `xterm-input-${this.id}`; this.term.textarea.id = `xterm-input-${this.id}`; }
         this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
@@ -289,6 +290,8 @@ class TerminalTab {
 
         const input = document.createElement('input');
         input.type = 'text';
+        input.name = `tab-rename-${this.id}`;
+        input.id = `tab-rename-${this.id}`;
         input.value = currentName;
         input.className = 'rename-input';
 
