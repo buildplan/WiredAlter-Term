@@ -53,3 +53,6 @@ alias ta='tmux attach'
 alias rec='asciinema rec'
 alias play='asciinema play'
 alias ports='nc -vz'
+
+# Auto-start or Auto-attach to a Tmux session named "main"
+[ -z "$TMUX" ] && exec tmux new-session -A -s main

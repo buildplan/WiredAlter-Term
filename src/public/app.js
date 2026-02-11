@@ -77,7 +77,12 @@ if (mouseBtn) {
         if (window.tabManager) {
             window.tabManager.tabs.forEach(tab => {
                 tab.term.options.allowMouseReporting = mouseReportingEnabled;
-                tab.term.clearSelection();
+                if (!mouseReportingEnabled) {
+                    tab.term.write('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l');
+                    tab.term.clearSelection();
+                } else {
+                    tab.term.write('\x1b[?1000h\x1b[?1002h\x1b[?1006h');
+                }
             });
             const active = window.tabManager.getActiveTab();
             if (active) active.term.focus();
@@ -204,6 +209,9 @@ class TerminalTab {
 
     setupSocketEvents() {
         this.socket.on('terminal:output', (data) => {
+            if (!mouseReportingEnabled) {
+                data = data.replace(/\x1b\[\?(1000|1002|1003|1006)h/g, '');
+            }
             this.term.write(data);
         });
 
