@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.6.0-trixie-slim
+FROM node:25.6.1-trixie-slim@sha256:5249f8aedf9432a08f0cfcca3d07a04ece95e6a8f4710590e1a8226b028c1233
 
 # Install Runtime Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
