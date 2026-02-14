@@ -645,19 +645,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- KEYBOARD SHORTCUTS ---
     window.addEventListener('keydown', (e) => {
-        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+        const isModifier = e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
 
-        // New Tab: Ctrl/Cmd + Alt + T
-        if (cmdOrCtrl && e.altKey && e.key.toLowerCase() === 't') {
+        // New Tab: Ctrl + Alt (Control + Option) + T
+        if (isModifier && e.key.toLowerCase() === 't') {
             e.preventDefault();
             e.stopPropagation();
             if (window.tabManager) window.tabManager.createTab();
             return;
         }
 
-        // Toggle Grid Mode: Ctrl/Cmd + Alt + G
-        if (cmdOrCtrl && e.altKey && e.key.toLowerCase() === 'g') {
+        // Toggle Grid Mode: Ctrl + Alt (Control + Option) + G
+        if (isModifier && e.key.toLowerCase() === 'g') {
             e.preventDefault();
             e.stopPropagation();
             const gridBtn = document.getElementById('grid-mode-btn');
@@ -665,9 +664,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Switch Tabs: Ctrl/Cmd + ArrowLeft or ArrowRight
-        if (cmdOrCtrl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-            if (e.shiftKey) return; 
+        // Switch Tabs: Ctrl + Alt (Control + Option) + [ OR ]
+        if (isModifier && (e.key === '[' || e.key === ']')) {
             e.preventDefault();
             e.stopPropagation();
             const tabElements = Array.from(document.querySelectorAll('.tab'));
@@ -675,9 +673,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (tabElements.length > 1 && activeTabEl) {
                 const currentIndex = tabElements.indexOf(activeTabEl);
                 let nextIndex;
-                if (e.key === 'ArrowLeft') {
+                if (e.key === '[') {
                     nextIndex = (currentIndex - 1 + tabElements.length) % tabElements.length;
-                } else {
+                }
+                else {
                     nextIndex = (currentIndex + 1) % tabElements.length;
                 }
                 tabElements[nextIndex].click();
