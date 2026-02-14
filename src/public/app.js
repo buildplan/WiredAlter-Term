@@ -642,4 +642,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (event.shiftKey) return;
         event.preventDefault();
     });
+
+    // --- KEYBOARD SHORTCUTS ---
+    window.addEventListener('keydown', (e) => {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+        // New Tab: Ctrl/Cmd + Alt + T
+        if (cmdOrCtrl && e.altKey && e.key.toLowerCase() === 't') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.tabManager) window.tabManager.createTab();
+            return;
+        }
+
+        // Toggle Grid Mode: Ctrl/Cmd + Alt + G
+        if (cmdOrCtrl && e.altKey && e.key.toLowerCase() === 'g') {
+            e.preventDefault();
+            e.stopPropagation();
+            const gridBtn = document.getElementById('grid-mode-btn');
+            if (gridBtn) gridBtn.click();
+            return;
+        }
+
+        // Switch Tabs: Ctrl/Cmd + ArrowLeft or ArrowRight
+        if (cmdOrCtrl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+            if (e.shiftKey) return; 
+            e.preventDefault();
+            e.stopPropagation();
+            const tabElements = Array.from(document.querySelectorAll('.tab'));
+            const activeTabEl = document.querySelector('.tab.active');
+            if (tabElements.length > 1 && activeTabEl) {
+                const currentIndex = tabElements.indexOf(activeTabEl);
+                let nextIndex;
+                if (e.key === 'ArrowLeft') {
+                    nextIndex = (currentIndex - 1 + tabElements.length) % tabElements.length;
+                } else {
+                    nextIndex = (currentIndex + 1) % tabElements.length;
+                }
+                tabElements[nextIndex].click();
+            }
+        }
+    }, true);
 });
