@@ -85,6 +85,7 @@ RUN chmod +x /usr/local/bin/wiredterm
 
 # Metadata
 ENV HOME=/home/node
+ENV _ZO_DATA_DIR=/data/.zoxide
 EXPOSE 3939
 
 # Healthcheck
