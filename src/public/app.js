@@ -137,6 +137,7 @@ class TerminalTab {
             cursorBlink: true,
             fontFamily: '"TermFont", monospace',
             fontSize: 14,
+            lineHeight: 1.2,
             fontWeight: 'normal',
             fontWeightBold: 'bold',
             allowTransparency: true,
