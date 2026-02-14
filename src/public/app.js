@@ -203,7 +203,10 @@ class TerminalTab {
         setTimeout(() => this.resize(), 50);
 
         this.resizeObserver = new ResizeObserver(() => {
-            if (this.isActive()) this.resize();
+            const isGrid = document.getElementById('terminals-container').classList.contains('grid-mode');
+            if (this.isActive() || isGrid) {
+                this.resize();
+            }
         });
         this.resizeObserver.observe(document.getElementById('terminals-container'));
     }
