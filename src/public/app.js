@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isModifier = e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
 
         // New Tab: Ctrl + Alt (Control + Option) + T
-        if (isModifier && e.key.toLowerCase() === 't') {
+        if (isModifier && e.code === 'KeyT') {
             e.preventDefault();
             e.stopPropagation();
             if (window.tabManager) window.tabManager.createTab();
@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Toggle Grid Mode: Ctrl + Alt (Control + Option) + G
-        if (isModifier && e.key.toLowerCase() === 'g') {
+        if (isModifier && e.code === 'KeyG') {
             e.preventDefault();
             e.stopPropagation();
             const gridBtn = document.getElementById('grid-mode-btn');
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Switch Tabs: Ctrl + Alt (Control + Option) + [ OR ]
-        if (isModifier && (e.key === '[' || e.key === ']')) {
+        if (isModifier && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
             e.preventDefault();
             e.stopPropagation();
             const tabElements = Array.from(document.querySelectorAll('.tab'));
@@ -673,7 +673,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (tabElements.length > 1 && activeTabEl) {
                 const currentIndex = tabElements.indexOf(activeTabEl);
                 let nextIndex;
-                if (e.key === '[') {
+                if (e.code === 'BracketLeft') {
                     nextIndex = (currentIndex - 1 + tabElements.length) % tabElements.length;
                 }
                 else {
