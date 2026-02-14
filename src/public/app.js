@@ -655,6 +655,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // Close Active Tab: Ctrl + Alt ((Control + Option)) + X
+        if (isModifier && e.code === 'KeyX') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.tabManager && window.tabManager.activeTabId) {
+                window.tabManager.closeTab(window.tabManager.activeTabId);
+            }
+            return;
+        }
+
         // Toggle Grid Mode: Ctrl + Alt (Control + Option) + G
         if (isModifier && e.code === 'KeyG') {
             e.preventDefault();
