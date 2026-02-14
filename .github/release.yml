@@ -20,6 +20,7 @@ changelog:
       labels:
         - 'dependencies'
         - 'renovate'
+        - 'dependabot'
 
     - title: 'Maintenance'
       labels:
