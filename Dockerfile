@@ -77,6 +77,12 @@ RUN mkdir -p /data && chown -R node:node /app /data /home/node
 COPY src/entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# CLI and versioning
+ARG BUILD_VERSION="unknown"
+ENV WIREDTERM_VERSION=${BUILD_VERSION}
+COPY src/wiredterm-cli.sh /usr/local/bin/wiredterm
+RUN chmod +x /usr/local/bin/wiredterm
+
 # Metadata
 ENV HOME=/home/node
 EXPOSE 3939
