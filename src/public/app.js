@@ -137,6 +137,7 @@ class TerminalTab {
             cursorBlink: true,
             fontFamily: '"TermFont", monospace',
             fontSize: 14,
+            lineHeight: 1.2,
             fontWeight: 'normal',
             fontWeightBold: 'bold',
             allowTransparency: true,
@@ -203,7 +204,10 @@ class TerminalTab {
         setTimeout(() => this.resize(), 50);
 
         this.resizeObserver = new ResizeObserver(() => {
-            if (this.isActive()) this.resize();
+            const isGrid = document.getElementById('terminals-container').classList.contains('grid-mode');
+            if (this.isActive() || isGrid) {
+                this.resize();
+            }
         });
         this.resizeObserver.observe(document.getElementById('terminals-container'));
     }
@@ -638,4 +642,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (event.shiftKey) return;
         event.preventDefault();
     });
+
+    // --- KEYBOARD SHORTCUTS ---
+    window.addEventListener('keydown', (e) => {
+        const isModifier = e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
+
+        // New Tab: Ctrl + Alt (Control + Option) + T
+        if (isModifier && e.code === 'KeyT') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.tabManager) window.tabManager.createTab();
+            return;
+        }
+
+        // Close Active Tab: Ctrl + Alt ((Control + Option)) + X
+        if (isModifier && e.code === 'KeyX') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.tabManager && window.tabManager.activeTabId) {
+                window.tabManager.closeTab(window.tabManager.activeTabId);
+            }
+            return;
+        }
+
+        // Toggle Grid Mode: Ctrl + Alt (Control + Option) + G
+        if (isModifier && e.code === 'KeyG') {
+            e.preventDefault();
+            e.stopPropagation();
+            const gridBtn = document.getElementById('grid-mode-btn');
+            if (gridBtn) gridBtn.click();
+            return;
+        }
+
+        // Switch Tabs: Ctrl + Alt (Control + Option) + [ OR ]
+        if (isModifier && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const tabElements = Array.from(document.querySelectorAll('.tab'));
+            const activeTabEl = document.querySelector('.tab.active');
+            if (tabElements.length > 1 && activeTabEl) {
+                const currentIndex = tabElements.indexOf(activeTabEl);
+                let nextIndex;
+                if (e.code === 'BracketLeft') {
+                    nextIndex = (currentIndex - 1 + tabElements.length) % tabElements.length;
+                }
+                else {
+                    nextIndex = (currentIndex + 1) % tabElements.length;
+                }
+                tabElements[nextIndex].click();
+            }
+        }
+    }, true);
 });
