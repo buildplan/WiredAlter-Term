@@ -655,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Close Active Tab: Ctrl + Alt ((Control + Option)) + X
+        // Close Active Tab: Ctrl + Alt (Control + Option) + X
         if (isModifier && e.code === 'KeyX') {
             e.preventDefault();
             e.stopPropagation();
@@ -671,6 +671,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.stopPropagation();
             const gridBtn = document.getElementById('grid-mode-btn');
             if (gridBtn) gridBtn.click();
+            return;
+        }
+
+        // Toggle Mouse Mode (Copy/Paste): Ctrl + Alt (Control + Option) + M
+        if (isModifier && e.code === 'KeyM') {
+            e.preventDefault();
+            e.stopPropagation();
+            const mouseModeBtn = document.getElementById('mouse-mode-btn');
+            if (mouseModeBtn) mouseModeBtn.click();
             return;
         }
 
