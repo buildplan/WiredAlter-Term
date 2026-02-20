@@ -683,6 +683,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // Toggle Theme (Light/Dark): Ctrl + Alt (Control + Option) + L
+        if (isModifier && e.code === 'KeyL') {
+            e.preventDefault();
+            e.stopPropagation();
+            const themeToggleBtn = document.getElementById('theme-btn');
+            if (themeToggleBtn) themeToggleBtn.click();
+            return;
+        }
+
         // Switch Tabs: Ctrl + Alt (Control + Option) + [ OR ]
         if (isModifier && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
             e.preventDefault();
