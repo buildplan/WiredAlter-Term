@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 import session from 'express-session';
-import sessionFileStore from '@sequencemedia/session-file-store';
+import BetterSqlite3 from 'better-sqlite3';
+import betterSqlite3SessionStore from 'better-sqlite3-session-store';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 
@@ -14,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
 const DATA_DIR = IS_TEST ? join(__dirname, '../test_data') : '/data';
 const PUBLIC_DIR = join(__dirname, 'public');
-const FileStore = sessionFileStore(session);
+const SqliteStore = betterSqlite3SessionStore(session);
 
 const app = express();
 const httpServer = createServer(app);
@@ -31,6 +32,9 @@ const sessionsDir = join(DATA_DIR, 'sessions');
 if (!fs.existsSync(sessionsDir)) {
     fs.mkdirSync(sessionsDir, { recursive: true });
 }
+
+const db = new BetterSqlite3(join(sessionsDir, 'sessions.db'));
+db.pragma('journal_mode = WAL');
 
 // --- 1. SECURITY MIDDLEWARE SETUP ---
 
@@ -71,10 +75,12 @@ const upload = multer({ storage });
 app.use(generalLimiter);
 
 app.use(session({
-    store: new FileStore({
-        path: sessionsDir,
-        ttl: 86400,
-        retries: 0
+    store: new SqliteStore({
+        client: db,
+        expired: {
+            clear: true,
+            intervalMs: 15 * 60 * 1000
+        }
     }),
     secret: process.env.SESSION_SECRET || 'wired-alter-term-secret-key',
     resave: false,
@@ -155,6 +161,8 @@ app.use((req, res, next) => {
     next();
 });
 app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+app.use('/vendor', express.static(join(PUBLIC_DIR, 'vendor'), { maxAge: '1y', immutable: true }));
 
 app.use(express.static(PUBLIC_DIR));
 

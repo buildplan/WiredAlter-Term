@@ -37,7 +37,16 @@ ARG ASCIINEMA_VERSION=v3.1.0
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ \
         fzf zoxide bat tmux bash-completion netcat-openbsd jq eza && \
-    npm install && npm cache clean --force && \
+    npm install && \
+    mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
+    cp node_modules/sortablejs/Sortable.min.js src/public/vendor/sortablejs/ && \
+    cp node_modules/@xterm/xterm/css/xterm.css src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/xterm/lib/xterm.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-fit/lib/addon-fit.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-web-links/lib/addon-web-links.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/ && \
+    npm cache clean --force && \
     # Install asciinema
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
