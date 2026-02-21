@@ -109,6 +109,19 @@ show_info() {
     printf '%s\n' "------------------------------------------------"
 }
 
+show_shortcuts() {
+    printf "%b⌨️  WiredTerm Keyboard Shortcuts:%b\n" "$C_BLUE" "$C_RESET"
+    printf '%s\n' "------------------------------------------------"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+T" "$C_RESET" "New Terminal Tab"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+X" "$C_RESET" "Close Active Tab"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+G" "$C_RESET" "Toggle Grid Mode"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+M" "$C_RESET" "Toggle Mouse Mode"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+L" "$C_RESET" "Toggle Theme"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+[ / ]" "$C_RESET" "Switch Tabs"
+    printf '%s\n' "------------------------------------------------"
+    printf "%bNote:%b On macOS, use Control + Option (Command is ignored by design).\n" "$C_GRAY" "$C_RESET"
+}
+
 case "$1" in
     -v|--version|version)
         show_version
@@ -119,12 +132,16 @@ case "$1" in
     --info|info)
         show_info
         ;;
+    --keys|keys|shortcuts)
+        show_shortcuts
+        ;;
     *)
         printf "%b💻 WiredTerm CLI%b\n\n" "$C_CYAN" "$C_RESET"
         printf "Usage: wiredterm [COMMAND]\n\n"
         printf "Commands:\n"
-        printf "  version, -v     Show version and check for updates\n"
-        printf "  tools, --tools  List installed backend tools & versions\n"
-        printf "  info, --info    Display system & container information\n"
+        printf "  version, -v      Show version and check for updates\n"
+        printf "  tools, --tools   List installed backend tools & versions\n"
+        printf "  info, --info     Display system & container information\n"
+        printf "  keys, shortcuts  Show terminal keyboard shortcuts\n"
         ;;
 esac
