@@ -28,7 +28,7 @@ Dockerfile
 # Environment variables
 compose.*
 compose-prod*
-docker-compose.*
+docker-compose*
 .env
 .env*
 
