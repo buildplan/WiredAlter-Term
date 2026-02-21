@@ -1,9 +1,13 @@
 #!/bin/sh
 
-# Dynamic Docker Socket Permission
-if [ -S /var/run/docker.sock ]; then
+# --- Docker Connection Logic ---
+if [ -n "$DOCKER_HOST" ]; then
+    # MODE 1: Socket Proxy
+    echo "🛡️  Using Secure Docker Socket Proxy at $DOCKER_HOST"
+elif [ -S /var/run/docker.sock ]; then
+    # MODE 2: Raw Socket (Legacy/High Risk)
     SOCKET_GID=$(stat -c '%g' /var/run/docker.sock)
-    echo "🔌 Detected Host Docker GID: $SOCKET_GID"
+    echo "🔌 Detected Raw Host Docker GID: $SOCKET_GID"
 
     if getent group "$SOCKET_GID" > /dev/null; then
         GROUP_NAME=$(getent group "$SOCKET_GID" | cut -d: -f1)
@@ -16,8 +20,10 @@ if [ -S /var/run/docker.sock ]; then
 
     usermod -aG "$GROUP_NAME" node
     echo "   Added 'node' user to group '$GROUP_NAME'"
+    echo "⚠️  WARNING: Running with raw socket access. This container has root access to the host."
 else
-    echo "⚠️  No Docker socket found. Running without Docker control."
+    # MODE 3: No Docker
+    echo "⚠️  No Docker connection configured (No DOCKER_HOST or docker.sock found)."
 fi
 
 # Fix Data Permissions
