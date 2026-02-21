@@ -1,13 +1,39 @@
 # Use Node.js 25 on Debian 13
+FROM node:25.6.1-trixie-slim@sha256:5249f8aedf9432a08f0cfcca3d07a04ece95e6a8f4710590e1a8226b028c1233 AS builder
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
+    cp node_modules/sortablejs/Sortable.min.js src/public/vendor/sortablejs/ && \
+    cp node_modules/@xterm/xterm/css/xterm.css src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/xterm/lib/xterm.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-fit/lib/addon-fit.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-web-links/lib/addon-web-links.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
+    cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/
+RUN npx --yes terser src/public/app.js -o src/public/app.js --compress --mangle && \
+    npx --yes terser src/public/login.js -o src/public/login.js --compress --mangle && \
+    npx --yes clean-css-cli -o src/public/style.css src/public/style.css
+
+RUN npm prune --omit=dev
+
+
 FROM node:25.6.1-trixie-slim@sha256:5249f8aedf9432a08f0cfcca3d07a04ece95e6a8f4710590e1a8226b028c1233
 
-# Install Runtime Dependencies
+# Install runtime tools.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init gosu git openssh-client vim nano curl wget unzip \
     htop ca-certificates iputils-ping dnsutils procps locales \
+    fzf zoxide bat tmux bash-completion netcat-openbsd jq eza \
     && rm -rf /var/lib/apt/lists/* \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
-    && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8
+    && localedef -i en_GB -c -f UTF-8 -A /usr/share/locale/locale.alias en_GB.UTF-8 \
+    && ln -s /usr/bin/batcat /usr/local/bin/bat
 
 # Active Locales
 ENV LANG=en_US.UTF-8
@@ -24,31 +50,12 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_V
 # Install Tailscale
 COPY --from=docker.io/tailscale/tailscale:v1.94.2@sha256:95e528798bebe75f39b10e74e7051cf51188ee615934f232ba7ad06a3390ffa1 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=docker.io/tailscale/tailscale:v1.94.2@sha256:95e528798bebe75f39b10e74e7051cf51188ee615934f232ba7ad06a3390ffa1 /usr/local/bin/tailscale /usr/local/bin/tailscale
-RUN mkdir -p /var/lib/tailscale && \
-    mkdir -p /var/run/tailscale && \
-    chown node:node /var/run/tailscale
+RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
 
-WORKDIR /app
-COPY package.json .
-
+# Install asciinema
 # renovate: datasource=github-releases depName=asciinema/asciinema
 ARG ASCIINEMA_VERSION=v3.1.0
-# Install Compilers -> Build -> Clean NPM -> Remove Compilers
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 make g++ \
-        fzf zoxide bat tmux bash-completion netcat-openbsd jq eza && \
-    npm install && \
-    mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
-    cp node_modules/sortablejs/Sortable.min.js src/public/vendor/sortablejs/ && \
-    cp node_modules/@xterm/xterm/css/xterm.css src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/xterm/lib/xterm.js src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/addon-fit/lib/addon-fit.js src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/addon-web-links/lib/addon-web-links.js src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/ && \
-    npm cache clean --force && \
-    # Install asciinema
-    ARCH=$(uname -m) && \
+RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
         URL="https://github.com/asciinema/asciinema/releases/download/${ASCIINEMA_VERSION}/asciinema-x86_64-unknown-linux-gnu"; \
     elif [ "$ARCH" = "aarch64" ]; then \
@@ -57,40 +64,37 @@ RUN apt-get update && \
         echo "❌ Unsupported architecture: $ARCH" && exit 1; \
     fi && \
     curl -L -o /usr/local/bin/asciinema "$URL" && \
-    chmod +x /usr/local/bin/asciinema && \
-    apt-get purge -y --auto-remove python3 make g++ && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -s /usr/bin/batcat /usr/local/bin/bat
+    chmod +x /usr/local/bin/asciinema
 
 # Prevent SSH from leaking local locale settings to remote servers
 RUN sed -i 's/^.*SendEnv LANG LC_.*$/#&/' /etc/ssh/ssh_config
 
-COPY . .
+WORKDIR /app
 
-# Copy Config Defaults
-COPY config/ /usr/local/share/smart-term/defaults/
+COPY --from=builder /app /app
 
+# Setup Seed Directories & Download Font
 # renovate: datasource=github-tags depName=ryanoasis/nerd-fonts
 ARG NERDFONT_VERSION=v3.4.0
-# Setup Seed Directories & Download Font
-RUN mkdir -p /usr/local/share/smart-term/fonts \
+RUN mkdir -p /usr/local/share/smart-term/defaults \
+             /usr/local/share/smart-term/fonts \
              /usr/local/share/smart-term/config && \
+    cp -r /app/config/* /usr/local/share/smart-term/defaults/ && \
     curl -L -o /usr/local/share/smart-term/fonts/font.ttf \
     "https://github.com/ryanoasis/nerd-fonts/raw/${NERDFONT_VERSION}/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
 # Configure Shell & Permissions
 RUN mkdir -p /data && chown -R node:node /app /data /home/node
 
-# Setup Entrypoint
-COPY src/entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Setup Entrypoint & CLI (moved out of the copied /app directory to the system path)
+RUN cp /app/src/entrypoint.sh /usr/local/bin/ && \
+    chmod +x /usr/local/bin/entrypoint.sh
 
 # CLI and versioning
 ARG BUILD_VERSION="unknown"
 ENV WIREDTERM_VERSION=${BUILD_VERSION}
-COPY src/wiredterm-cli.sh /usr/local/bin/wiredterm
-RUN chmod +x /usr/local/bin/wiredterm
+RUN cp /app/src/wiredterm-cli.sh /usr/local/bin/wiredterm && \
+    chmod +x /usr/local/bin/wiredterm
 
 # Metadata
 ENV HOME=/home/node
