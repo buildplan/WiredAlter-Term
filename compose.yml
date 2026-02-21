@@ -1,4 +1,34 @@
 services:
+  docker-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: docker-proxy
+    environment:
+      - CONTAINERS=1   # docker ps
+      - IMAGES=1       # docker images
+      - NETWORKS=1     # docker network ls
+      - VOLUMES=1      # docker volume ls
+      - INFO=1         # docker info
+      # --- TERMINAL EXECUTION ---
+      - EXEC=1         # docker exec
+      # --- STRICT SECURITY ---
+      - POST=0         # Blocks container creation/deletion
+      - SECRETS=0      # Blocks swarm secrets
+      - AUTH=0         # Blocks registry auth
+      # --- OPTIONAL: CONTAINER LIFECYCLE ---
+      # If you want to allow restarting containers without allowing creation:
+      # - ALLOW_RESTARTS=1 
+      # - ALLOW_STOP=1
+      # - ALLOW_START=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - internal-net
+    restart: unless-stopped
+    # Harden the proxy container itself:
+    read_only: true
+    tmpfs:
+      - /run
+
   wiredalter-term:
     build: .
     # use this pre-build image from this repo or build your own
@@ -7,14 +37,18 @@ services:
     hostname: wiredterm  # you can change this whatever you want to see in terminal
     ports:
       - "127.0.0.1:3939:3939"
+    networks:
+      - internal-net
     volumes:
       - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock # mount Docker sock for host docker management in the terminal
+      # - /var/run/docker.sock:/var/run/docker.sock # mount Docker sock for host docker management in the terminal (riskly use proxy above)
       - tailscale-data:/var/lib/tailscale # Persist Tailscale state (keys/identity)
     environment:
       - NODE_ENV=production
       - PIN=324252             # <--- Change this
       - SESSION_SECRET=sup3r_s3cr3t_k3y_chang3_m3 # <--- Change this
+
+      - DOCKER_HOST=tcp://docker-proxy:2375 # this lets terminal use proxy above to manage Docker on host
 
       # [Required if you want to enable tailscale] Your Auth Key (from Headscale or Tailscale)
       # Generate this at: https://login.tailscale.com/admin/settings/keys
@@ -29,6 +63,12 @@ services:
       - TAILSCALE_FLAGS=--ssh --accept-routes
 
     restart: unless-stopped
+    depends_on:
+      - docker-proxy
+
+networks:
+  internal-net:
+    internal: true
 
 volumes:
   tailscale-data:

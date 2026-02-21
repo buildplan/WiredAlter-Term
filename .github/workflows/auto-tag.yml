@@ -5,8 +5,15 @@ on:
     branches:
       - main
     # Don't run on tags
-    tags-ignore:
-      - '**'
+    tags-ignore: [ '**' ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'renovate.json'
+      - 'LICENSE'
+      - 'docs/**'
+      - '.workflow/dependabot.yml'
+      - '.github/workflow/auto-tag.yml'
 
 jobs:
   tag:

@@ -7,6 +7,11 @@ describe('WiredAlter-Term Full Suite', () => {
     const agent = supertest.agent(app);
     const CORRECT_PIN = "123456"; // matches default in index.js
 
+    // Force process exit to clear dangling intervals
+    after(() => {
+        setTimeout(() => process.exit(0), 10);
+    });
+
     // --- 1. PUBLIC ACCESS TESTS ---
 
     it('GET /login should load correctly', async () => {

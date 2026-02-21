@@ -17,6 +17,7 @@ test
 test/
 test_data
 test_data/
+.vscode/
 
 # Docker & GitHub files
 Dockerfile
@@ -27,7 +28,7 @@ Dockerfile
 # Environment variables
 compose.*
 compose-prod*
-docker-compose.*
+docker-compose*
 .env
 .env*
 

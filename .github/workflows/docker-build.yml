@@ -4,6 +4,14 @@ on:
   push:
     branches: [ "main", "dev", "dev-*", "dev_*" ]
     tags: [ 'v*.*.*' ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'renovate.json'
+      - 'LICENSE'
+      - 'docs/**'
+      - '.workflow/dependabot.yml'
+      - '.github/workflow/auto-tag.yml'
   workflow_dispatch:
 
 env:
