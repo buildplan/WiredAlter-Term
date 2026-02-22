@@ -1,3 +1,4 @@
+import helmet from 'helmet';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -90,6 +91,23 @@ class NativeSQLiteStore extends session.Store {
 
 // Required for secure cookies behind Cloudflare/Nginx
 app.set('trust proxy', 1);
+
+// Add Helmet Security Headers
+app.use(helmet({
+    xFrameOptions: { action: "deny" },
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            connectSrc: ["'self'", "ws:", "wss:"],
+            scriptSrc: ["'self'", "'unsafe-eval'"],
+            workerSrc: ["'self'", "blob:"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            fontSrc: ["'self'"],
+            imgSrc: ["'self'", "data:"]
+        },
+    }
+}));
 
 app.use(session({
     store: new NativeSQLiteStore(),
