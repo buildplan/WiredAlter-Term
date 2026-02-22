@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
+  "abandonmentThreshold": "2 years",
   "pinDigests": false,
   "rangeStrategy": "bump",
   "packageRules": [
