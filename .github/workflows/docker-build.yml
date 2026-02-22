@@ -100,12 +100,11 @@ jobs:
 
       # Cleanup
       - name: Clean up old GHCR images
-        uses: quartx-analytics/ghcr-cleaner@v1
+        uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          owner-type: user
           token: ${{ secrets.PAT_TOKEN }}
-          repository-owner: ${{ github.repository_owner }}
-          repository-name: ${{ github.event.repository.name }}
           delete-untagged: true
-          keep-at-most: 10
+          keep-n-tagged: 10
+          use-regex: true
+          exclude-tags: '^latest$|^main$|^dev$|^[0-9]+\.[0-9]+\.[0-9]+.*$'
         continue-on-error: true
