@@ -100,7 +100,7 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             connectSrc: ["'self'", "ws:", "wss:"],
-            scriptSrc: ["'self'", "'unsafe-eval'"],
+            scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
             workerSrc: ["'self'", "blob:"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             fontSrc: ["'self'"],
