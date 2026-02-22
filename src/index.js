@@ -7,7 +7,6 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 import session from 'express-session';
 import BetterSqlite3 from 'better-sqlite3';
-import betterSqlite3SessionStore from 'better-sqlite3-session-store';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 
@@ -15,7 +14,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
 const DATA_DIR = IS_TEST ? join(__dirname, '../test_data') : '/data';
 const PUBLIC_DIR = join(__dirname, 'public');
-const SqliteStore = betterSqlite3SessionStore(session);
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,7 +25,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 process.env.STARSHIP_CONFIG = join(process.env.HOME, '.config', 'starship.toml');
 
-// --- 0. PRE-FLIGHT CHECKS ---
+// --- 0. PRE-FLIGHT CHECKS & DB INIT ---
 const sessionsDir = join(DATA_DIR, 'sessions');
 if (!fs.existsSync(sessionsDir)) {
     fs.mkdirSync(sessionsDir, { recursive: true });
@@ -36,10 +34,77 @@ if (!fs.existsSync(sessionsDir)) {
 const db = new BetterSqlite3(join(sessionsDir, 'sessions.db'));
 db.pragma('journal_mode = WAL');
 
-// --- 1. SECURITY MIDDLEWARE SETUP ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    data TEXT,
+    expiresAt INTEGER
+  )
+`);
+
+// --- 1. SESSION STORE ---
+class NativeSQLiteStore extends session.Store {
+    constructor() {
+        super();
+        this.getStmt = db.prepare('SELECT data FROM sessions WHERE sid = ? AND expiresAt > ?');
+        this.setStmt = db.prepare('INSERT INTO sessions (sid, data, expiresAt) VALUES (?, ?, ?) ON CONFLICT(sid) DO UPDATE SET data = excluded.data, expiresAt = excluded.expiresAt');
+        this.destroyStmt = db.prepare('DELETE FROM sessions WHERE sid = ?');
+        this.touchStmt = db.prepare('UPDATE sessions SET expiresAt = ? WHERE sid = ?');
+        this.clearStmt = db.prepare('DELETE FROM sessions WHERE expiresAt <= ?');
+
+        setInterval(() => {
+            try { this.clearStmt.run(Date.now()); } catch(e) { console.error('Session cleanup error:', e); }
+        }, 15 * 60 * 1000).unref();
+    }
+
+    get(sid, cb) {
+        try {
+            const row = this.getStmt.get(sid, Date.now());
+            cb(null, row ? JSON.parse(row.data) : null);
+        } catch (err) { cb(err); }
+    }
+
+    set(sid, sessionData, cb) {
+        try {
+            const expires = sessionData.cookie?.expires ? new Date(sessionData.cookie.expires).getTime() : Date.now() + 86400000;
+            this.setStmt.run(sid, JSON.stringify(sessionData), expires);
+            cb(null);
+        } catch (err) { cb(err); }
+    }
+
+    destroy(sid, cb) {
+        try { this.destroyStmt.run(sid); cb(null); }
+        catch (err) { cb(err); }
+    }
+
+    touch(sid, sessionData, cb) {
+        try {
+            const expires = sessionData.cookie?.expires ? new Date(sessionData.cookie.expires).getTime() : Date.now() + 86400000;
+            this.touchStmt.run(expires, sid);
+            if (cb) cb(null);
+        } catch (err) { if(cb) cb(err); }
+    }
+}
+
+// --- 2. SECURITY MIDDLEWARE SETUP ---
 
 // Required for secure cookies behind Cloudflare/Nginx
 app.set('trust proxy', 1);
+
+app.use(session({
+    store: new NativeSQLiteStore(),
+    cookie: {
+        secure: IS_PRODUCTION,
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+    },
+    secret: process.env.SESSION_SECRET || 'wired-alter-term-secret-key',
+    resave: false,
+    saveUninitialized: false
+}));
+
+app.use(express.json());
 
 // Strict Limiter for Login (Brute Force Protection)
 const loginLimiter = rateLimit({
@@ -59,6 +124,9 @@ const generalLimiter = rateLimit({
     message: "Too many requests. Please slow down."
 });
 
+// Apply general limiter globally to all routes
+app.use(generalLimiter);
+
 // --- UPLOAD CONFIGURATION ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -71,31 +139,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Apply general limiter globally to all routes
-app.use(generalLimiter);
 
-app.use(session({
-    store: new SqliteStore({
-        client: db,
-        expired: {
-            clear: true,
-            intervalMs: 15 * 60 * 1000
-        }
-    }),
-    secret: process.env.SESSION_SECRET || 'wired-alter-term-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: IS_PRODUCTION,
-        httpOnly: true,
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
-    }
-}));
-
-app.use(express.json());
-
-// --- 2. AUTHENTICATION ROUTES ---
+// --- 3. AUTHENTICATION ROUTES ---
 
 app.get('/login', (req, res) => {
     if (req.session.authenticated) return res.redirect('/');
@@ -133,7 +178,7 @@ const requireAuth = (req, res, next) => {
 
 app.use(requireAuth);
 
-// --- 3. GENERAL MIDDLEWARE & ROUTES ---
+// --- 4. GENERAL MIDDLEWARE & ROUTES ---
 
 // Upload Handler
 app.post('/upload', upload.array('files'), (req, res) => {
@@ -175,7 +220,7 @@ app.get('/fonts/font.ttf', (req, res) => {
     res.sendFile(fontPath);
 });
 
-// --- 4. PERSISTENCE SETUP ---
+// --- 5. PERSISTENCE SETUP ---
 const setupPersistence = () => {
     if (IS_TEST) return;
 
@@ -245,7 +290,7 @@ const setupPersistence = () => {
 
 setupPersistence();
 
-// --- 5. TERMINAL LOGIC ---
+// --- 6. TERMINAL LOGIC ---
 io.on('connection', (socket) => {
     const shell = process.env.SHELL || 'bash';
     const ptyProcess = pty.spawn(shell, [], {
