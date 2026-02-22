@@ -103,8 +103,10 @@ jobs:
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.PAT_TOKEN }}
+          package: wiredalter-term
           delete-untagged: true
           keep-n-tagged: 10
           use-regex: true
+          # Protects exactly: 'latest', 'main', 'dev', and 'X.X.X'
           exclude-tags: '^latest$|^main$|^dev$|^[0-9]+\.[0-9]+\.[0-9]+.*$'
         continue-on-error: true
