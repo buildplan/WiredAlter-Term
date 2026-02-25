@@ -310,13 +310,15 @@ setupPersistence();
 
 // --- 6. TERMINAL LOGIC ---
 io.on('connection', (socket) => {
-    const shell = process.env.SHELL || 'bash';
-    const ptyProcess = pty.spawn(shell, [], {
+    const cleanEnv = { ...process.env, TERM: 'xterm-256color' };
+    delete cleanEnv.TMUX;
+    delete cleanEnv.TMUX_PANE;
+    const ptyProcess = pty.spawn('bash', [], {
         name: 'xterm-256color',
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
-        env: { ...process.env, TERM: 'xterm-256color' }
+        env: cleanEnv
     });
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
     ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect();});
