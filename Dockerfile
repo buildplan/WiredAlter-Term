@@ -16,9 +16,9 @@ RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
     cp node_modules/@xterm/addon-web-links/lib/addon-web-links.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/
-RUN npx --yes terser src/public/app.js -o src/public/app.js --compress --mangle && \
-    npx --yes terser src/public/login.js -o src/public/login.js --compress --mangle && \
-    npx --yes clean-css-cli -o src/public/style.css src/public/style.css
+RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
+    npx terser src/public/login.js -o src/public/login.js --compress --mangle && \
+    npx clean-css-cli -o src/public/style.css src/public/style.css
 
 RUN npm prune --omit=dev
 
