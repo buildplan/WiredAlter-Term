@@ -55,4 +55,12 @@ alias play='asciinema play'
 alias ports='nc -vz'
 
 # Auto-start or Auto-attach to a Tmux session named "main"
-[ -z "$TMUX" ] && exec tmux new-session -A -s main
+# --- TMUX AUTO-START WITH ESCAPE HATCH ---
+if command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
+    if [ ! -f "$HOME/.notmux" ]; then exec tmux new-session -A -s main; fi
+fi
+
+# --- TMUX TOGGLE ALIASES ---
+alias tmux-off="touch ~/.notmux && echo '❌ Tmux auto-start disabled. Refresh the page or open a new tab to enter a raw shell.'"
+alias tmux-on="rm -f ~/.notmux && echo '✅ Tmux auto-start enabled. Refresh the page or open a new tab to enter Tmux.'"
+
