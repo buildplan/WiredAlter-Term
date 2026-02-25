@@ -61,6 +61,5 @@ if command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
 fi
 
 # --- TMUX TOGGLE ALIASES ---
-alias tmux-off="touch ~/.notmux && echo '❌ Tmux auto-start disabled. Refresh the page or open a new tab to enter a raw shell.'"
-alias tmux-on="rm -f ~/.notmux && echo '✅ Tmux auto-start enabled. Refresh the page or open a new tab to enter Tmux.'"
-
+alias tmux-off="touch ~/.notmux && clear && echo '❌ Tmux auto-start disabled. Type \"exit\" to close this session, then click New Tab (+).'"
+alias tmux-on="rm -f ~/.notmux && clear && if [ -z \"\$TMUX\" ]; then exec tmux new-session -A -s main; else echo '✅ Tmux auto-start enabled.'; fi"
