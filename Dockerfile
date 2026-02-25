@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.6.1-trixie-slim@sha256:5249f8aedf9432a08f0cfcca3d07a04ece95e6a8f4710590e1a8226b028c1233 AS builder
+FROM node:25.7.0-trixie-slim@sha256:f8e300c21d41d23cf53ce0fe60478d491039f01a55107966d690574d1692587c AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++
@@ -16,13 +16,13 @@ RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
     cp node_modules/@xterm/addon-web-links/lib/addon-web-links.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/
-RUN npx --yes terser src/public/app.js -o src/public/app.js --compress --mangle && \
-    npx --yes terser src/public/login.js -o src/public/login.js --compress --mangle && \
-    npx --yes clean-css-cli -o src/public/style.css src/public/style.css
+RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
+    npx terser src/public/login.js -o src/public/login.js --compress --mangle && \
+    npx clean-css-cli -o src/public/style.css src/public/style.css
 
 RUN npm prune --omit=dev
 
-FROM node:25.6.1-trixie-slim@sha256:5249f8aedf9432a08f0cfcca3d07a04ece95e6a8f4710590e1a8226b028c1233
+FROM node:25.7.0-trixie-slim@sha256:f8e300c21d41d23cf53ce0fe60478d491039f01a55107966d690574d1692587c
 
 # Install runtime tools.
 RUN apt-get update && apt-get install -y --no-install-recommends \
