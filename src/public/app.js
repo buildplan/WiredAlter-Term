@@ -4,13 +4,21 @@ const themes = {
         background: '#0d1117',
         foreground: '#c9d1d9',
         cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33'
+        selectionBackground: '#58a6ff33',
+        searchMatchBackground: '#3fb95040',
+        searchMatchBorder: '#3fb950',
+        searchMatchActiveBackground: '#d2992280',
+        searchMatchActiveBorder: '#d29922'
     },
     light: {
         background: '#ffffff',
         foreground: '#24292f',
         cursor: '#0969da',
-        selectionBackground: '#0969da33'
+        selectionBackground: '#0969da33',        
+        searchMatchBackground: '#0969da33',
+        searchMatchBorder: '#0969da',
+        searchMatchActiveBackground: '#bf398940',
+        searchMatchActiveBorder: '#bf3989'
     }
 };
 
