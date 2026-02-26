@@ -1,5 +1,6 @@
 import helmet from 'helmet';
 import express from 'express';
+import crypto from 'crypto';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import pty from 'node-pty';
@@ -167,8 +168,12 @@ app.get('/login', (req, res) => {
 
 // Use the stricter loginLimiter specifically for verification
 app.post('/verify-pin', loginLimiter, (req, res) => {
-    const { pin } = req.body;
-    if (pin === PIN) {
+    const { pin } = req.body;    
+    if (!pin || typeof pin !== 'string' || pin.length !== PIN.length) {
+        return res.status(401).json({ error: "ACCESS DENIED: Invalid Passcode" });
+    }
+    const isMatch = crypto.timingSafeEqual(Buffer.from(pin), Buffer.from(PIN));
+    if (isMatch) {
         req.session.authenticated = true;
         req.session.save(() => {
             res.json({ success: true });
