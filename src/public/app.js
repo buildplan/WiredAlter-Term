@@ -162,14 +162,13 @@ class TerminalTab {
         this.term.loadAddon(this.serializeAddon);
         this.searchAddon = new SearchAddon.SearchAddon();
         this.term.loadAddon(this.searchAddon);
-        const unicode11Addon = new Unicode11Addon.Unicode11Addon();
-        this.term.loadAddon(unicode11Addon);
-        this.term.unicode.activeVersion = '11';
 
         try {
-            this.term.loadAddon(new ImageAddon.ImageAddon());
+            const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+            this.term.loadAddon(unicode11Addon);
+            this.term.unicode.activeVersion = '11';
         } catch (e) {
-            console.warn(`[Tab ${this.id}] Image addon could not be loaded:`, e);
+            console.warn(`[Tab ${this.id}] Unicode11 addon failed to load:`, e);
         }
         try {
             this.webglAddon = new WebglAddon.WebglAddon();
