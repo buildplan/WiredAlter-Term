@@ -116,6 +116,7 @@ class TerminalTab {
         this.manager = manager;
         this.name = name || `Terminal ${id}`;
         this.savedContent = savedContent;
+        this.altBuffer = false;
 
         this.socket = null;
         this.term = null;
@@ -214,6 +215,13 @@ class TerminalTab {
 
     setupSocketEvents() {
         this.socket.on('terminal:output', (data) => {
+            if (data.includes('\x1b[?1049h')) {
+                this.altBuffer = true;
+            } else if (data.includes('\x1b[?1049l')) {
+                this.altBuffer = false;
+                setTimeout(() => this.manager.saveState(), 100);
+            }
+
             if (!mouseReportingEnabled) {
                 data = data.replace(/\x1b\[\?(1000|1002|1003|1006)h/g, '');
             }
@@ -331,7 +339,9 @@ class TerminalTab {
     }
 
     getContent() {
-        return this.serializeAddon ? this.serializeAddon.serialize() : '';
+        if (this.altBuffer) { return this.savedContent; }
+        this.savedContent = this.serializeAddon ? this.serializeAddon.serialize() : '';
+        return this.savedContent;
     }
 
     isActive() {
