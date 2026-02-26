@@ -162,18 +162,31 @@ class TerminalTab {
         this.term.loadAddon(this.serializeAddon);
         this.searchAddon = new SearchAddon.SearchAddon();
         this.term.loadAddon(this.searchAddon);
+        const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+        this.term.loadAddon(unicode11Addon);
+        this.term.unicode.activeVersion = '11';
 
         try {
-            this.term.loadAddon(new WebLinksAddon.WebLinksAddon());
-        } catch (e) { console.warn("WebLinks addon missing"); }
-
+            this.term.loadAddon(new LigaturesAddon.LigaturesAddon());
+        } catch (e) {
+            console.warn(`[Tab ${this.id}] Ligatures addon could not be loaded:`, e);
+        }
+        try {
+            this.term.loadAddon(new ImageAddon.ImageAddon());
+        } catch (e) {
+            console.warn(`[Tab ${this.id}] Image addon could not be loaded:`, e);
+        }
         try {
             this.webglAddon = new WebglAddon.WebglAddon();
-            this.term.loadAddon(this.webglAddon);
-            this.webglAddon.onContextLoss(() => this.webglAddon.dispose());
+            this.term.loadAddon(this.webglAddon);            
+            this.webglAddon.onContextLoss(() => {
+                console.warn(`[Tab ${this.id}] WebGL context lost. Falling back to native DOM renderer.`);
+                this.webglAddon.dispose();
+            });
             console.log(`[Tab ${this.id}] 🚀 WebGL Renderer Active`);
         } catch (e) {
-            console.warn(`[Tab ${this.id}] ⚠️ WebGL failed, falling back to Canvas`, e);
+            console.warn(`[Tab ${this.id}] ⚠️ WebGL failed on boot. Falling back to native DOM renderer.`, e);
+            if (this.webglAddon) this.webglAddon.dispose();
         }
 
         this.socket = io({
