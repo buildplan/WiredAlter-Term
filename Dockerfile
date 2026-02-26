@@ -17,7 +17,6 @@ RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
     cp node_modules/@xterm/addon-serialize/lib/addon-serialize.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-search/lib/addon-search.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/ && \
-    cp node_modules/@xterm/addon-ligatures/lib/addon-ligatures.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-image/lib/addon-image.js src/public/vendor/xterm/
 RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \

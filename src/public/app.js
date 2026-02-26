@@ -167,11 +167,6 @@ class TerminalTab {
         this.term.unicode.activeVersion = '11';
 
         try {
-            this.term.loadAddon(new LigaturesAddon.LigaturesAddon());
-        } catch (e) {
-            console.warn(`[Tab ${this.id}] Ligatures addon could not be loaded:`, e);
-        }
-        try {
             this.term.loadAddon(new ImageAddon.ImageAddon());
         } catch (e) {
             console.warn(`[Tab ${this.id}] Image addon could not be loaded:`, e);
