@@ -117,13 +117,14 @@ show_shortcuts() {
     printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+G" "$C_RESET" "Toggle Grid Mode"
     printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+M" "$C_RESET" "Toggle Mouse Mode"
     printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+L" "$C_RESET" "Toggle Theme"
+    printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+F" "$C_RESET" "Search in Terminal"
     printf "%b%-15s%b %s\n" "$C_GREEN" "Ctrl+Alt+[ / ]" "$C_RESET" "Switch Tabs"
     printf '%s\n' "------------------------------------------------"
     printf "%bNote:%b On macOS, use Control + Option (Command is ignored by design).\n" "$C_GRAY" "$C_RESET"
 }
 
 case "$1" in
-    -v|--version|version)
+    -v|--V|--version|version|v|V)
         show_version
         ;;
     --tools|tools)
