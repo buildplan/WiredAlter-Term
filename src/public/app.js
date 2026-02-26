@@ -4,20 +4,20 @@ const themes = {
         background: '#0d1117',
         foreground: '#c9d1d9',
         cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33',
-        searchMatchBackground: '#3fb95040',
+        selectionBackground: 'rgba(88, 166, 255, 0.2)',
+        searchMatchBackground: 'rgba(63, 185, 80, 0.25)',
         searchMatchBorder: '#3fb950',
-        searchMatchActiveBackground: '#d2992280',
+        searchMatchActiveBackground: 'rgba(210, 153, 34, 0.5)',
         searchMatchActiveBorder: '#d29922'
     },
     light: {
         background: '#ffffff',
         foreground: '#24292f',
         cursor: '#0969da',
-        selectionBackground: '#0969da33',        
-        searchMatchBackground: '#0969da33',
+        selectionBackground: 'rgba(9, 105, 218, 0.2)',        
+        searchMatchBackground: 'rgba(9, 105, 218, 0.2)',
         searchMatchBorder: '#0969da',
-        searchMatchActiveBackground: '#bf398940',
+        searchMatchActiveBackground: 'rgba(191, 57, 137, 0.25)',
         searchMatchActiveBorder: '#bf3989'
     }
 };
@@ -157,11 +157,12 @@ class TerminalTab {
 
         this.fitAddon = new FitAddon.FitAddon();
         this.term.loadAddon(this.fitAddon);
-
         this.serializeAddon = new SerializeAddon.SerializeAddon();
         this.term.loadAddon(this.serializeAddon);
         this.searchAddon = new SearchAddon.SearchAddon();
         this.term.loadAddon(this.searchAddon);
+        this.webLinksAddon = new WebLinksAddon.WebLinksAddon();
+        this.term.loadAddon(this.webLinksAddon);
 
         try {
             const unicode11Addon = new Unicode11Addon.Unicode11Addon();
