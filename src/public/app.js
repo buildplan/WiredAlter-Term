@@ -152,6 +152,8 @@ class TerminalTab {
 
         this.serializeAddon = new SerializeAddon.SerializeAddon();
         this.term.loadAddon(this.serializeAddon);
+        this.searchAddon = new SearchAddon.SearchAddon();
+        this.term.loadAddon(this.searchAddon);
 
         try {
             this.term.loadAddon(new WebLinksAddon.WebLinksAddon());
@@ -653,6 +655,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         event.preventDefault();
     });
 
+    // --- TERMINAL SEARCH LOGIC ---
+    const searchBar = document.getElementById('search-bar');
+    const searchInput = document.getElementById('search-input');
+    const searchPrev = document.getElementById('search-prev');
+    const searchNext = document.getElementById('search-next');
+    const searchClose = document.getElementById('search-close');
+
+    function executeSearch(next = true) {
+        if (!window.tabManager) return;
+        const activeTab = window.tabManager.getActiveTab();
+        if (!activeTab || !activeTab.searchAddon) return;
+        
+        const term = searchInput.value;
+        if (!term) return;
+
+        if (next) activeTab.searchAddon.findNext(term);
+        else activeTab.searchAddon.findPrevious(term);
+    }
+
+    function closeSearch() {
+        searchBar.classList.add('hidden');
+        if (window.tabManager) {
+            const activeTab = window.tabManager.getActiveTab();
+            if (activeTab) {
+                if (activeTab.searchAddon) activeTab.searchAddon.clearDecorations();
+                activeTab.term.focus();
+            }
+        }
+    }
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            executeSearch(!e.shiftKey); // Shift+Enter searches backwards
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSearch();
+        }
+    });
+
+    searchNext.addEventListener('click', () => executeSearch(true));
+    searchPrev.addEventListener('click', () => executeSearch(false));
+    searchClose.addEventListener('click', closeSearch);
+
     // --- KEYBOARD SHORTCUTS ---
     window.addEventListener('keydown', (e) => {
         const isModifier = e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
@@ -699,6 +745,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.stopPropagation();
             const themeToggleBtn = document.getElementById('theme-btn');
             if (themeToggleBtn) themeToggleBtn.click();
+            return;
+        }
+
+        // Open Search: Ctrl + Alt (Control + Option) + F
+        if (isModifier && e.code === 'KeyF') {
+            e.preventDefault();
+            e.stopPropagation();
+            searchBar.classList.remove('hidden');
+            searchInput.focus();
+            searchInput.select();
             return;
         }
 

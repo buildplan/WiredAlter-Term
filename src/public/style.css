@@ -270,6 +270,45 @@ body {
     height: 0;
 }
 
+/* --- SEARCH BAR --- */
+.search-bar {
+    position: absolute;
+    top: 45px; /* Sits right below the tab bar */
+    right: 20px;
+    background: var(--bg-header);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px;
+    display: flex;
+    gap: 6px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    opacity: 1;
+    transition: opacity 0.2s, top 0.2s;
+}
+
+.search-bar.hidden {
+    opacity: 0;
+    pointer-events: none;
+    top: 35px; /* Slides up slightly when hiding */
+}
+
+.search-bar input {
+    background: var(--term-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    width: 200px;
+}
+
+.search-bar input:focus {
+    border-color: var(--term-cursor);
+}
+
 /* Common Button Styles */
 .icon-btn {
     background-color: var(--btn-bg);
