@@ -5,19 +5,19 @@ const themes = {
         foreground: '#c9d1d9',
         cursor: '#58a6ff',
         selectionBackground: 'rgba(88, 166, 255, 0.2)',
-        searchMatchBackground: 'rgba(63, 185, 80, 0.25)',
-        searchMatchBorder: '#3fb950',
-        searchMatchActiveBackground: 'rgba(210, 153, 34, 0.5)',
+        searchMatchBackground: '#238636',
+        searchMatchBorder: '#2ea043',
+        searchMatchActiveBackground: '#9e6a03',
         searchMatchActiveBorder: '#d29922'
     },
     light: {
         background: '#ffffff',
         foreground: '#24292f',
         cursor: '#0969da',
-        selectionBackground: 'rgba(9, 105, 218, 0.2)',        
-        searchMatchBackground: 'rgba(9, 105, 218, 0.2)',
+        selectionBackground: 'rgba(9, 105, 218, 0.2)',
+        searchMatchBackground: '#c2e7ff',
         searchMatchBorder: '#0969da',
-        searchMatchActiveBackground: 'rgba(191, 57, 137, 0.25)',
+        searchMatchActiveBackground: '#ffd8b5',
         searchMatchActiveBorder: '#bf3989'
     }
 };
@@ -173,7 +173,7 @@ class TerminalTab {
         }
         try {
             this.webglAddon = new WebglAddon.WebglAddon();
-            this.term.loadAddon(this.webglAddon);            
+            this.term.loadAddon(this.webglAddon);
             this.webglAddon.onContextLoss(() => {
                 console.warn(`[Tab ${this.id}] WebGL context lost. Falling back to native DOM renderer.`);
                 this.webglAddon.dispose();
@@ -682,12 +682,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!window.tabManager) return;
         const activeTab = window.tabManager.getActiveTab();
         if (!activeTab || !activeTab.searchAddon) return;
-        
         const term = searchInput.value;
         if (!term) return;
-
-        if (next) activeTab.searchAddon.findNext(term);
-        else activeTab.searchAddon.findPrevious(term);
+        try {
+            const activeTheme = themes[currentTheme];
+            const searchOpts = {
+                decorations: {
+                    matchBackground: activeTheme.searchMatchBackground,
+                    matchBorder: activeTheme.searchMatchBorder,
+                    activeMatchBackground: activeTheme.searchMatchActiveBackground,
+                    activeMatchBorder: activeTheme.searchMatchActiveBorder
+                }
+            };
+            if (next) activeTab.searchAddon.findNext(term, searchOpts);
+            else activeTab.searchAddon.findPrevious(term, searchOpts);
+        } catch (error) {
+            console.warn("⚠️ Custom highlights rejected by Xterm. Falling back to default search.", error);
+            if (next) activeTab.searchAddon.findNext(term);
+            else activeTab.searchAddon.findPrevious(term);
+        }
     }
 
     function closeSearch() {
