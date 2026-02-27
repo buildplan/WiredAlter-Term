@@ -684,23 +684,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!activeTab || !activeTab.searchAddon) return;
         const term = searchInput.value;
         if (!term) return;
-        try {
-            const activeTheme = themes[currentTheme];
-            const searchOpts = {
-                decorations: {
-                    matchBackground: activeTheme.searchMatchBackground,
-                    matchBorder: activeTheme.searchMatchBorder,
-                    activeMatchBackground: activeTheme.searchMatchActiveBackground,
-                    activeMatchBorder: activeTheme.searchMatchActiveBorder
-                }
-            };
-            if (next) activeTab.searchAddon.findNext(term, searchOpts);
-            else activeTab.searchAddon.findPrevious(term, searchOpts);
-        } catch (error) {
-            console.warn("⚠️ Custom highlights rejected by Xterm. Falling back to default search.", error);
-            if (next) activeTab.searchAddon.findNext(term);
-            else activeTab.searchAddon.findPrevious(term);
-        }
+        if (next) activeTab.searchAddon.findNext(term);
+        else activeTab.searchAddon.findPrevious(term);
     }
 
     function closeSearch() {
