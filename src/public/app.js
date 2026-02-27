@@ -5,20 +5,16 @@ const themes = {
         foreground: '#c9d1d9',
         cursor: '#58a6ff',
         selectionBackground: 'rgba(88, 166, 255, 0.2)',
-        searchMatchBackground: '#238636',
-        searchMatchBorder: '#2ea043',
-        searchMatchActiveBackground: '#9e6a03',
-        searchMatchActiveBorder: '#d29922'
+        searchHighlightBg: '#d29922',
+        searchHighlightFg: '#000000'
     },
     light: {
         background: '#ffffff',
         foreground: '#24292f',
         cursor: '#0969da',
         selectionBackground: 'rgba(9, 105, 218, 0.2)',
-        searchMatchBackground: '#c2e7ff',
-        searchMatchBorder: '#0969da',
-        searchMatchActiveBackground: '#ffd8b5',
-        searchMatchActiveBorder: '#bf3989'
+        searchHighlightBg: '#bf3989',
+        searchHighlightFg: '#ffffff'
     }
 };
 
@@ -682,8 +678,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!window.tabManager) return;
         const activeTab = window.tabManager.getActiveTab();
         if (!activeTab || !activeTab.searchAddon) return;
+
         const term = searchInput.value;
         if (!term) return;
+
+        const baseTheme = themes[currentTheme];
+        activeTab.term.options.theme = {
+            ...baseTheme,
+            selectionBackground: baseTheme.searchHighlightBg,
+            selectionForeground: baseTheme.searchHighlightFg
+        };
+
         if (next) activeTab.searchAddon.findNext(term);
         else activeTab.searchAddon.findPrevious(term);
     }
@@ -693,7 +698,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.tabManager) {
             const activeTab = window.tabManager.getActiveTab();
             if (activeTab) {
-                if (activeTab.searchAddon) activeTab.searchAddon.clearDecorations();
+                activeTab.term.options.theme = themes[currentTheme];
+                activeTab.term.clearSelection();
                 activeTab.term.focus();
             }
         }
