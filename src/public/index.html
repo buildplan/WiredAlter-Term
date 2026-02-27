@@ -5,19 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WiredTerm</title>
 
+    <link rel="apple-touch-icon" href="/terminal.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💻</text></svg>">
     
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
-    <link rel="stylesheet" href="style.css?v=3.1">
+    <link rel="stylesheet" href="style.css?v=3.3">
 
     <script src="/vendor/sortablejs/Sortable.min.js"></script>
     <script src="/vendor/xterm/xterm.js"></script>
     <script src="/vendor/xterm/addon-fit.js"></script>
     <script src="/vendor/xterm/addon-web-links.js"></script>
     <script src="/vendor/xterm/addon-serialize.js"></script>
+    <script src="/vendor/xterm/addon-search.js"></script>
     <script src="/vendor/xterm/addon-webgl.js"></script>
+    <script src="/vendor/xterm/addon-unicode11.js"></script>
+
+    <style>
+        body { background-color: #0d1117; margin: 0; }
+    </style>
 
     <script>
         (function() {
@@ -100,6 +112,12 @@
                     </svg>
                 </button>
             </div>
+            <div id="search-bar" class="search-bar hidden">
+                <input type="text" id="search-input" placeholder="Search terminal..." autocomplete="off" spellcheck="false" />
+                <button id="search-prev" class="icon-btn" title="Previous (Shift+Enter)">↑</button>
+                <button id="search-next" class="icon-btn" title="Next (Enter)">↓</button>
+                <button id="search-close" class="icon-btn" title="Close (Escape)">✕</button>
+            </div>
             <div id="terminals-container" class="terminals-container"></div>
         </div>
 
@@ -113,6 +131,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     
-    <script src="app.js"></script>
+    <script src="app.js?v=2.0"></script>
 </body>
 </html>

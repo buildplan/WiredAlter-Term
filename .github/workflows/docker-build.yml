@@ -38,7 +38,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y make g++ python3
-          npm ci
+          npm ci --loglevel=error --no-fund
 
       # Run the test script
       - name: Run Tests

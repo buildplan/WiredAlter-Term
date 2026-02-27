@@ -4,13 +4,21 @@ const themes = {
         background: '#0d1117',
         foreground: '#c9d1d9',
         cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33'
+        selectionBackground: 'rgba(88, 166, 255, 0.2)',
+        searchMatchBackground: '#238636',
+        searchMatchBorder: '#2ea043',
+        searchMatchActiveBackground: '#9e6a03',
+        searchMatchActiveBorder: '#d29922'
     },
     light: {
         background: '#ffffff',
         foreground: '#24292f',
         cursor: '#0969da',
-        selectionBackground: '#0969da33'
+        selectionBackground: 'rgba(9, 105, 218, 0.2)',
+        searchMatchBackground: '#c2e7ff',
+        searchMatchBorder: '#0969da',
+        searchMatchActiveBackground: '#ffd8b5',
+        searchMatchActiveBorder: '#bf3989'
     }
 };
 
@@ -116,6 +124,7 @@ class TerminalTab {
         this.manager = manager;
         this.name = name || `Terminal ${id}`;
         this.savedContent = savedContent;
+        this.altBuffer = false;
 
         this.socket = null;
         this.term = null;
@@ -148,21 +157,31 @@ class TerminalTab {
 
         this.fitAddon = new FitAddon.FitAddon();
         this.term.loadAddon(this.fitAddon);
-
         this.serializeAddon = new SerializeAddon.SerializeAddon();
         this.term.loadAddon(this.serializeAddon);
+        this.searchAddon = new SearchAddon.SearchAddon();
+        this.term.loadAddon(this.searchAddon);
+        this.webLinksAddon = new WebLinksAddon.WebLinksAddon();
+        this.term.loadAddon(this.webLinksAddon);
 
         try {
-            this.term.loadAddon(new WebLinksAddon.WebLinksAddon());
-        } catch (e) { console.warn("WebLinks addon missing"); }
-
+            const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+            this.term.loadAddon(unicode11Addon);
+            this.term.unicode.activeVersion = '11';
+        } catch (e) {
+            console.warn(`[Tab ${this.id}] Unicode11 addon failed to load:`, e);
+        }
         try {
             this.webglAddon = new WebglAddon.WebglAddon();
             this.term.loadAddon(this.webglAddon);
-            this.webglAddon.onContextLoss(() => this.webglAddon.dispose());
+            this.webglAddon.onContextLoss(() => {
+                console.warn(`[Tab ${this.id}] WebGL context lost. Falling back to native DOM renderer.`);
+                this.webglAddon.dispose();
+            });
             console.log(`[Tab ${this.id}] 🚀 WebGL Renderer Active`);
         } catch (e) {
-            console.warn(`[Tab ${this.id}] ⚠️ WebGL failed, falling back to Canvas`, e);
+            console.warn(`[Tab ${this.id}] ⚠️ WebGL failed on boot. Falling back to native DOM renderer.`, e);
+            if (this.webglAddon) this.webglAddon.dispose();
         }
 
         this.socket = io({
@@ -214,6 +233,13 @@ class TerminalTab {
 
     setupSocketEvents() {
         this.socket.on('terminal:output', (data) => {
+            if (data.includes('\x1b[?1049h')) {
+                this.altBuffer = true;
+            } else if (data.includes('\x1b[?1049l')) {
+                this.altBuffer = false;
+                setTimeout(() => this.manager.saveState(), 100);
+            }
+
             if (!mouseReportingEnabled) {
                 data = data.replace(/\x1b\[\?(1000|1002|1003|1006)h/g, '');
             }
@@ -331,7 +357,9 @@ class TerminalTab {
     }
 
     getContent() {
-        return this.serializeAddon ? this.serializeAddon.serialize() : '';
+        if (this.altBuffer) { return this.savedContent; }
+        this.savedContent = this.serializeAddon ? this.serializeAddon.serialize() : '';
+        return this.savedContent;
     }
 
     isActive() {
@@ -643,6 +671,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         event.preventDefault();
     });
 
+    // --- TERMINAL SEARCH LOGIC ---
+    const searchBar = document.getElementById('search-bar');
+    const searchInput = document.getElementById('search-input');
+    const searchPrev = document.getElementById('search-prev');
+    const searchNext = document.getElementById('search-next');
+    const searchClose = document.getElementById('search-close');
+
+    function executeSearch(next = true) {
+        if (!window.tabManager) return;
+        const activeTab = window.tabManager.getActiveTab();
+        if (!activeTab || !activeTab.searchAddon) return;
+        const term = searchInput.value;
+        if (!term) return;
+        try {
+            const activeTheme = themes[currentTheme];
+            const searchOpts = {
+                decorations: {
+                    matchBackground: activeTheme.searchMatchBackground,
+                    matchBorder: activeTheme.searchMatchBorder,
+                    activeMatchBackground: activeTheme.searchMatchActiveBackground,
+                    activeMatchBorder: activeTheme.searchMatchActiveBorder
+                }
+            };
+            if (next) activeTab.searchAddon.findNext(term, searchOpts);
+            else activeTab.searchAddon.findPrevious(term, searchOpts);
+        } catch (error) {
+            console.warn("⚠️ Custom highlights rejected by Xterm. Falling back to default search.", error);
+            if (next) activeTab.searchAddon.findNext(term);
+            else activeTab.searchAddon.findPrevious(term);
+        }
+    }
+
+    function closeSearch() {
+        searchBar.classList.add('hidden');
+        if (window.tabManager) {
+            const activeTab = window.tabManager.getActiveTab();
+            if (activeTab) {
+                if (activeTab.searchAddon) activeTab.searchAddon.clearDecorations();
+                activeTab.term.focus();
+            }
+        }
+    }
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            executeSearch(!e.shiftKey); // Shift+Enter searches backwards
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSearch();
+        }
+    });
+
+    searchNext.addEventListener('click', () => executeSearch(true));
+    searchPrev.addEventListener('click', () => executeSearch(false));
+    searchClose.addEventListener('click', closeSearch);
+
     // --- KEYBOARD SHORTCUTS ---
     window.addEventListener('keydown', (e) => {
         const isModifier = e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
@@ -689,6 +774,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.stopPropagation();
             const themeToggleBtn = document.getElementById('theme-btn');
             if (themeToggleBtn) themeToggleBtn.click();
+            return;
+        }
+
+        // Open Search: Ctrl + Alt (Control + Option) + F
+        if (isModifier && e.code === 'KeyF') {
+            e.preventDefault();
+            e.stopPropagation();
+            searchBar.classList.remove('hidden');
+            searchInput.focus();
+            searchInput.select();
             return;
         }
 
