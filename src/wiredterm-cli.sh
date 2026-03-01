@@ -66,6 +66,8 @@ check_tool() {
             starship) VER=$(starship --version | head -n 1 | awk '{print $2}') ;;
             bash) VER=$(bash --version | head -n 1) ;;
             docker) VER=$(docker --version | awk '{print $3}' | tr -d ',') ;;
+            curl) VER=$(curl --version | head -n 1 | awk '{print $2}') ;;
+            eza) VER=$(eza --version | awk 'NR==2 {print $1}') ;;
             *) VER=$("$tool" --version 2>/dev/null | head -n 1) ;;
         esac
         if [ -z "$VER" ]; then VER="Detected"; fi
