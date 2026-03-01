@@ -84,9 +84,15 @@ show_tools() {
     check_tool "starship"
     check_tool "bash"
     check_tool "docker"
+    check_tool "git"
+    check_tool "asciinema"
+    check_tool "fzf"
+    check_tool "zoxide"
     check_tool "jq"
     check_tool "eza"
     check_tool "bat"
+    check_tool "htop"
+    check_tool "curl"
     printf '%s\n' "------------------------------------------------"
 }
 
