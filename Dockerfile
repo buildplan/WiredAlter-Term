@@ -55,7 +55,7 @@ RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/t
 
 # Install asciinema
 # renovate: datasource=github-releases depName=asciinema/asciinema
-ARG ASCIINEMA_VERSION=v3.1.0
+ARG ASCIINEMA_VERSION=v3.2.0
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
         URL="https://github.com/asciinema/asciinema/releases/download/${ASCIINEMA_VERSION}/asciinema-x86_64-unknown-linux-gnu"; \
