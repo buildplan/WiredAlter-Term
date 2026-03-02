@@ -673,6 +673,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchPrev = document.getElementById('search-prev');
     const searchNext = document.getElementById('search-next');
     const searchClose = document.getElementById('search-close');
+    const searchTriggerBtn = document.getElementById('search-trigger-btn');
+
+    if (searchTriggerBtn) {
+        searchTriggerBtn.addEventListener('click', () => {
+            searchBar.classList.remove('hidden');
+            searchInput.focus();
+            searchInput.select();
+        });
+    }
 
     function executeSearch(next = true) {
         if (!window.tabManager) return;

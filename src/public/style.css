@@ -140,9 +140,16 @@ body {
     flex-direction: row;
     align-items: center;
     overflow-x: auto;
+    overflow-y: hidden;
     flex: 1;
     height: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    max-width: calc(100vw - 110px);
 }
+
+.tabs-list::-webkit-scrollbar { display: none; }
+.tabs-header > button { flex-shrink: 0; }
 
 .tab {
     display: flex;
