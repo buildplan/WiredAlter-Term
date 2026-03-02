@@ -140,9 +140,16 @@ body {
     flex-direction: row;
     align-items: center;
     overflow-x: auto;
+    overflow-y: hidden;
     flex: 1;
     height: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    max-width: calc(100vw - 110px);
 }
+
+.tabs-list::-webkit-scrollbar { display: none; }
+.tabs-header > button { flex-shrink: 0; }
 
 .tab {
     display: flex;
@@ -487,7 +494,7 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
 /* --- GRID MODE --- */
 .terminals-container.grid-mode {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
     grid-auto-rows: 1fr;
     gap: 8px;
     background: transparent;

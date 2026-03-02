@@ -16,7 +16,7 @@
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
-    <link rel="stylesheet" href="style.css?v=3.3">
+    <link rel="stylesheet" href="style.css?v=3.4">
 
     <script src="/vendor/sortablejs/Sortable.min.js"></script>
     <script src="/vendor/xterm/xterm.js"></script>
@@ -101,6 +101,12 @@
         <div class="terminal-workspace">
             <div class="tabs-header">
                 <div id="tabs-list" class="tabs-list"></div>
+                <button id="search-trigger-btn" class="icon-btn" title="Search (Ctrl+Alt+F)" style="margin-right: 5px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
                 <button id="grid-mode-btn" class="icon-btn" title="Toggle Grid View" style="margin-right: 5px;">
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
                         <path stroke-width="2" d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
@@ -131,6 +137,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     
-    <script src="app.js?v=2.0"></script>
+    <script src="app.js?v=2.1"></script>
 </body>
 </html>
