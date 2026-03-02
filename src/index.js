@@ -184,8 +184,11 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/login');
+    req.session.destroy((err) => {
+        if (err) { console.error("⚠️ Logout Session Error:", err); }
+        res.clearCookie('connect.sid');
+        res.redirect('/login');
+    });
 });
 
 // Auth Guard Middleware
