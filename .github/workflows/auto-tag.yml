@@ -8,6 +8,7 @@ on:
     tags-ignore: [ '**' ]
     paths-ignore:
       - '**.md'
+      - 'compose.yml'
       - '.gitignore'
       - 'renovate.json'
       - 'LICENSE'

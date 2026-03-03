@@ -6,6 +6,7 @@ on:
     tags: [ 'v*.*.*' ]
     paths-ignore:
       - '**.md'
+      - 'compose.yml'
       - '.gitignore'
       - 'renovate.json'
       - 'LICENSE'
