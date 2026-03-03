@@ -9,7 +9,7 @@
     { "matchUpdateTypes": ["minor","patch"], "automerge": true },
     { "description": "Group all xterm related packages together", "groupName": "xterm packages", "matchPackageNames": ["/^xterm/"] }
   ],
-  "constraints": { "node": "25.7.0" },
+  "constraints": { "node": "25.8.0" },
   "customManagers": [
     {
       "customType": "regex",
