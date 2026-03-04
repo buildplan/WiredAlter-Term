@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.7.0-trixie-slim@sha256:f8e300c21d41d23cf53ce0fe60478d491039f01a55107966d690574d1692587c AS builder
+FROM node:25.8.0-trixie-slim@sha256:bac06594bd1fd30d7c4af1ac92a9b2f2484614974e48aa40c275e3efa37bae2b AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++
@@ -24,7 +24,7 @@ RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
 
 RUN npm prune --omit=dev
 
-FROM node:25.7.0-trixie-slim@sha256:f8e300c21d41d23cf53ce0fe60478d491039f01a55107966d690574d1692587c
+FROM node:25.8.0-trixie-slim@sha256:bac06594bd1fd30d7c4af1ac92a9b2f2484614974e48aa40c275e3efa37bae2b
 
 # Install runtime tools.
 RUN apt-get update && apt-get install -y --no-install-recommends \
