@@ -191,7 +191,16 @@ class TerminalTab {
         this.setupSocketEvents();
 
         this.term.open(this.element);
-        if (this.term.textarea) { this.term.textarea.name = `xterm-input-${this.id}`; this.term.textarea.id = `xterm-input-${this.id}`; }
+        
+        if (this.term.textarea) { 
+            this.term.textarea.name = `xterm-input-${this.id}`; 
+            this.term.textarea.id = `xterm-input-${this.id}`;             
+            this.term.textarea.setAttribute('autocapitalize', 'off');
+            this.term.textarea.setAttribute('autocorrect', 'off');
+            this.term.textarea.setAttribute('spellcheck', 'false');            
+            this.term.textarea.setAttribute('autocomplete', 'new-password'); 
+            this.term.textarea.setAttribute('inputmode', 'email'); 
+        }
         this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
