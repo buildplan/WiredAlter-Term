@@ -63,7 +63,7 @@ jobs:
 
       # Setup Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       # Login to GitHub Container Registry
       - name: Log in to the Container registry
