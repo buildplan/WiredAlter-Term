@@ -807,6 +807,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, true);
 
+    // --- MOBILE VIEWPORT FIX ---
+    if (window.visualViewport) {
+        const resizeViewport = () => {
+            document.body.style.height = window.visualViewport.height + 'px';
+            window.scrollTo(0, 0);
+            if (window.tabManager) {
+                const activeTab = window.tabManager.getActiveTab();
+                if (activeTab) activeTab.resize();
+            }
+        };
+        window.visualViewport.addEventListener('resize', resizeViewport);
+        window.visualViewport.addEventListener('scroll', resizeViewport);
+        resizeViewport();
+    }
+
     // --- VIRTUAL MOBILE KEYBOARD LOGIC ---
     let mobileCtrlActive = false;
     let mobileAltActive = false;
