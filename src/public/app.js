@@ -840,28 +840,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 1. Handle clicking the virtual buttons
     document.querySelectorAll('.m-key').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
         btn.addEventListener('click', (e) => {
-            e.preventDefault(); // Stop keyboard from closing
+            e.preventDefault(); 
             const keyType = btn.getAttribute('data-key');
-            
+            const activeTab = window.tabManager ? window.tabManager.getActiveTab() : null;
             if (keyType === 'ctrl') {
                 mobileCtrlActive = !mobileCtrlActive;
                 mCtrlBtn.classList.toggle('active-toggle', mobileCtrlActive);
+                if (activeTab) activeTab.term.focus();
                 return;
             }
             if (keyType === 'alt') {
                 mobileAltActive = !mobileAltActive;
                 mAltBtn.classList.toggle('active-toggle', mobileAltActive);
+                if (activeTab) activeTab.term.focus();
                 return;
             }
-
-            // If it's a standard special key (Esc, Tab, Arrows), send it immediately
-            if (mKeyMap[keyType] && window.tabManager) {
-                const activeTab = window.tabManager.getActiveTab();
-                if (activeTab && activeTab.socket) {
-                    activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
-                    activeTab.term.focus(); // Keep the software keyboard open
-                }
+            if (mKeyMap[keyType] && activeTab && activeTab.socket) {
+                activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
+                activeTab.term.focus();
             }
         });
     });
