@@ -191,11 +191,15 @@ class TerminalTab {
         this.setupSocketEvents();
 
         this.term.open(this.element);
-        if (this.term.textarea) { this.term.textarea.name = `xterm-input-${this.id}`; this.term.textarea.id = `xterm-input-${this.id}`; }
-        this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.fitAddon.fit();
+        if (this.term.textarea) {
+            this.term.textarea.name = `xterm-input-${this.id}`;
+            this.term.textarea.id = `xterm-input-${this.id}`;
+            this.term.textarea.setAttribute('autocapitalize', 'none');
+            this.term.textarea.setAttribute('autocorrect', 'off');
+            this.term.textarea.setAttribute('autocomplete', 'off');
+            this.term.textarea.setAttribute('spellcheck', 'false');
+            this.term.textarea.setAttribute('data-gramm', 'false');
+        }
 
         if (this.savedContent) {
             this.term.write(this.savedContent);
@@ -869,29 +873,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.tabManager) {
         const originalEmit = io.Socket.prototype.emit;
         io.Socket.prototype.emit = function(eventName, payload) {
-            if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
+            if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && typeof payload === 'string' && payload.length === 1) {
                 let modifiedPayload = payload;
                 const charCode = payload.charCodeAt(0);
 
-                // If Ctrl is active, translate a-z to ASCII 1-26 (e.g. 'c' becomes \x03)
-                if (mobileCtrlActive && charCode >= 97 && charCode <= 122) {
-                    modifiedPayload = String.fromCharCode(charCode - 96);
-                    mobileCtrlActive = false; // Turn off toggle after one use
+                if (mobileCtrlActive) {
+                    if (charCode >= 97 && charCode <= 122) {
+                        modifiedPayload = String.fromCharCode(charCode - 96);
+                    } else if (charCode >= 65 && charCode <= 90) {
+                        modifiedPayload = String.fromCharCode(charCode - 64);
+                    } else if (payload === ' ') {
+                        modifiedPayload = '\x00';
+                    }
+                    mobileCtrlActive = false;
                     mCtrlBtn.classList.remove('active-toggle');
                 }
 
-                // If Alt is active, prepend the Escape character (\x1b)
                 if (mobileAltActive) {
                     modifiedPayload = '\x1b' + modifiedPayload;
-                    mobileAltActive = false; // Turn off toggle after one use
+                    mobileAltActive = false;
                     mAltBtn.classList.remove('active-toggle');
                 }
-
-                // Send the heavily modified character instead!
                 return originalEmit.call(this, eventName, modifiedPayload);
             }
-            
-            // Standard emit
             return originalEmit.apply(this, arguments);
         };
     }
