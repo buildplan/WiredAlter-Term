@@ -806,4 +806,79 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     }, true);
+
+    // --- VIRTUAL MOBILE KEYBOARD LOGIC ---
+    let mobileCtrlActive = false;
+    let mobileAltActive = false;
+    const mCtrlBtn = document.getElementById('m-ctrl-btn');
+    const mAltBtn = document.getElementById('m-alt-btn');
+
+    // ANSI hex codes for special keys
+    const mKeyMap = {
+        'esc': '\x1b',
+        'tab': '\x09',
+        'up': '\x1b[A',
+        'down': '\x1b[B',
+        'right': '\x1b[C',
+        'left': '\x1b[D'
+    };
+
+    // 1. Handle clicking the virtual buttons
+    document.querySelectorAll('.m-key').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); // Stop keyboard from closing
+            const keyType = btn.getAttribute('data-key');
+            
+            if (keyType === 'ctrl') {
+                mobileCtrlActive = !mobileCtrlActive;
+                mCtrlBtn.classList.toggle('active-toggle', mobileCtrlActive);
+                return;
+            }
+            if (keyType === 'alt') {
+                mobileAltActive = !mobileAltActive;
+                mAltBtn.classList.toggle('active-toggle', mobileAltActive);
+                return;
+            }
+
+            // If it's a standard special key (Esc, Tab, Arrows), send it immediately
+            if (mKeyMap[keyType] && window.tabManager) {
+                const activeTab = window.tabManager.getActiveTab();
+                if (activeTab && activeTab.socket) {
+                    activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
+                    activeTab.term.focus(); // Keep the software keyboard open
+                }
+            }
+        });
+    });
+
+    // 2. Intercept actual typing to apply the Ctrl/Alt modifiers
+    if (window.tabManager) {
+        const originalEmit = io.Socket.prototype.emit;
+        io.Socket.prototype.emit = function(eventName, payload) {
+            if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
+                let modifiedPayload = payload;
+                const charCode = payload.charCodeAt(0);
+
+                // If Ctrl is active, translate a-z to ASCII 1-26 (e.g. 'c' becomes \x03)
+                if (mobileCtrlActive && charCode >= 97 && charCode <= 122) {
+                    modifiedPayload = String.fromCharCode(charCode - 96);
+                    mobileCtrlActive = false; // Turn off toggle after one use
+                    mCtrlBtn.classList.remove('active-toggle');
+                }
+
+                // If Alt is active, prepend the Escape character (\x1b)
+                if (mobileAltActive) {
+                    modifiedPayload = '\x1b' + modifiedPayload;
+                    mobileAltActive = false; // Turn off toggle after one use
+                    mAltBtn.classList.remove('active-toggle');
+                }
+
+                // Send the heavily modified character instead!
+                return originalEmit.call(this, eventName, modifiedPayload);
+            }
+            
+            // Standard emit
+            return originalEmit.apply(this, arguments);
+        };
+    }
 });

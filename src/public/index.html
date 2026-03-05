@@ -16,7 +16,7 @@
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
-    <link rel="stylesheet" href="style.css?v=3.6">
+    <link rel="stylesheet" href="style.css?v=4.0">
 
     <script src="/vendor/sortablejs/Sortable.min.js"></script>
     <script src="/vendor/xterm/xterm.js"></script>
@@ -127,6 +127,17 @@
             <div id="terminals-container" class="terminals-container"></div>
         </div>
 
+        <div id="mobile-keyboard-bar" class="mobile-keyboard-bar hidden">
+            <button class="m-key" data-key="esc">ESC</button>
+            <button class="m-key" data-key="ctrl" id="m-ctrl-btn">CTRL</button>
+            <button class="m-key" data-key="alt" id="m-alt-btn">ALT</button>
+            <button class="m-key" data-key="tab">TAB</button>
+            <button class="m-key" data-key="up">↑</button>
+            <button class="m-key" data-key="down">↓</button>
+            <button class="m-key" data-key="left">←</button>
+            <button class="m-key" data-key="right">→</button>
+        </div>
+
         <div id="drop-overlay" class="drop-overlay hidden">
             <div class="drop-message">
                 <span style="font-size: 4rem;">📂</span>
@@ -137,6 +148,6 @@
 
     <script src="/socket.io/socket.io.js"></script>
     
-    <script src="app.js?v=2.1"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 </html>
