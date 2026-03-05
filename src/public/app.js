@@ -840,25 +840,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Handle clicking the virtual buttons
     document.querySelectorAll('.m-key').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const keyType = btn.getAttribute('data-key');
+            const activeTab = window.tabManager ? window.tabManager.getActiveTab() : null;
             if (keyType === 'ctrl') {
                 mobileCtrlActive = !mobileCtrlActive;
                 mCtrlBtn.classList.toggle('active-toggle', mobileCtrlActive);
+                if (activeTab) activeTab.term.focus();
                 return;
             }
             if (keyType === 'alt') {
                 mobileAltActive = !mobileAltActive;
                 mAltBtn.classList.toggle('active-toggle', mobileAltActive);
+                if (activeTab) activeTab.term.focus();
                 return;
             }
-            if (mKeyMap[keyType] && window.tabManager) {
-                const activeTab = window.tabManager.getActiveTab();
-                if (activeTab && activeTab.socket) {
-                    activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
-                    activeTab.term.focus();
-                }
+            if (mKeyMap[keyType] && activeTab && activeTab.socket) {
+                activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
+                activeTab.term.focus();
             }
         });
     });
@@ -870,8 +871,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
                 let modifiedPayload = payload;
                 const charCode = payload.charCodeAt(0);
-                if (mobileCtrlActive && charCode >= 97 && charCode <= 122) {
-                    modifiedPayload = String.fromCharCode(charCode - 96);
+                if (mobileCtrlActive) {
+                    if (charCode >= 97 && charCode <= 122) {
+                        modifiedPayload = String.fromCharCode(charCode - 96);
+                    }
+                    else if (charCode >= 65 && charCode <= 90) {
+                        modifiedPayload = String.fromCharCode(charCode - 64);
+                    }
+                    else if (payload === ' ') {
+                        modifiedPayload = '\x00';
+                    }
                     mobileCtrlActive = false;
                     mCtrlBtn.classList.remove('active-toggle');
                 }
