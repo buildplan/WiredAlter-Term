@@ -5,6 +5,11 @@
   "pinDigests": false,
   "rangeStrategy": "bump",
   "packageRules": [
+    { 
+      "description": "Force disable digest pinning for Docker to prevent multi-arch build failures",
+      "matchDatasources": ["docker"], 
+      "pinDigests": false 
+    },
     { "matchUpdateTypes": ["pin","digest","pinDigest"], "enabled": false },
     { "matchUpdateTypes": ["minor","patch"], "automerge": true },
     { "description": "Group all xterm related packages together", "groupName": "xterm packages", "matchPackageNames": ["/^xterm/"] }
