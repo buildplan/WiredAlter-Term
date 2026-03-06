@@ -191,15 +191,14 @@ class TerminalTab {
         this.setupSocketEvents();
 
         this.term.open(this.element);
-        
-        if (this.term.textarea) { 
-            this.term.textarea.name = `xterm-input-${this.id}`; 
-            this.term.textarea.id = `xterm-input-${this.id}`;             
+        if (this.term.textarea) {
+            this.term.textarea.name = `xterm-input-${this.id}`;
+            this.term.textarea.id = `xterm-input-${this.id}`;
             this.term.textarea.setAttribute('autocapitalize', 'off');
             this.term.textarea.setAttribute('autocorrect', 'off');
-            this.term.textarea.setAttribute('spellcheck', 'false');            
-            this.term.textarea.setAttribute('autocomplete', 'new-password'); 
-            this.term.textarea.setAttribute('inputmode', 'email'); 
+            this.term.textarea.setAttribute('spellcheck', 'false');
+            this.term.textarea.setAttribute('autocomplete', 'new-password');
+            this.term.textarea.setAttribute('inputmode', 'email');
         }
         this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
@@ -878,6 +877,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         const originalEmit = io.Socket.prototype.emit;
         io.Socket.prototype.emit = function(eventName, payload) {
             if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
+                const charLower = payload.toLowerCase();
+
+                // --- LOCAL APP SHORTCUTS (Ctrl + Alt) ---
+                if (mobileCtrlActive && mobileAltActive) {
+                    let shortcutTriggered = false;
+
+                    if (charLower === 't') { if (window.tabManager) window.tabManager.createTab(); shortcutTriggered = true; }
+                    else if (charLower === 'x') { if (window.tabManager && window.tabManager.activeTabId) window.tabManager.closeTab(window.tabManager.activeTabId); shortcutTriggered = true; }
+                    else if (charLower === 'g') { const btn = document.getElementById('grid-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                    else if (charLower === 'm') { const btn = document.getElementById('mouse-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                    else if (charLower === 'l') { const btn = document.getElementById('theme-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                    else if (charLower === 'f') {
+                        const searchBar = document.getElementById('search-bar');
+                        const searchInput = document.getElementById('search-input');
+                        if (searchBar && searchInput) {
+                            searchBar.classList.remove('hidden');
+                            searchInput.focus();
+                            searchInput.select();
+                        }
+                        shortcutTriggered = true;
+                    }
+                    else if (payload === '[' || payload === ']') {
+                        const tabElements = Array.from(document.querySelectorAll('.tab'));
+                        const activeTabEl = document.querySelector('.tab.active');
+                        if (tabElements.length > 1 && activeTabEl) {
+                            const currentIndex = tabElements.indexOf(activeTabEl);
+                            const nextIndex = payload === '['
+                                ? (currentIndex - 1 + tabElements.length) % tabElements.length
+                                : (currentIndex + 1) % tabElements.length;
+                            tabElements[nextIndex].click();
+                        }
+                        shortcutTriggered = true;
+                    }
+                    if (shortcutTriggered) {
+                        mobileCtrlActive = false;
+                        mobileAltActive = false;
+                        mCtrlBtn.classList.remove('active-toggle');
+                        mAltBtn.classList.remove('active-toggle');
+                        return;
+                    }
+                }
+
+                // --- STANDARD TERMINAL MODIFIERS ---
                 let modifiedPayload = payload;
                 const charCode = payload.charCodeAt(0);
                 if (mobileCtrlActive) {
