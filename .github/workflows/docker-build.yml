@@ -47,7 +47,7 @@ jobs:
 
   # JOB 2: BUILD & PUSH (Only runs if 'test' passes)
   build-and-push:
-    needs: test 
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,23 +100,11 @@ jobs:
             BUILD_VERSION=${{ github.ref_name }}
 
       # Cleanup
-      - name: Clean up old dev tags
-        uses: dataaxiom/ghcr-cleanup-action@v1
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
-          package: wiredalter-term
-          delete-tags: 'dev-*' 
-          keep-n-tagged: 2 
-        continue-on-error: true
-
       - name: Clean up old GHCR images
-        uses: dataaxiom/ghcr-cleanup-action@v1
+        uses: freke/github_docker_package_cleanup@v1.0.0-rc3
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          package: wiredalter-term
-          delete-untagged: true
-          keep-n-tagged: 10
-          use-regex: true
-          # Protects exactly: 'latest', 'main', 'dev', and 'X.X.X'
-          exclude-tags: '^latest$|^main$|^dev$|^[0-9]+\.[0-9]+\.[0-9]+.*$'
-        continue-on-error: true
+          package: "wiredalter-term"
+          keep: "^main$, ^dev$"
+          days: 30
+          dry_run: false
