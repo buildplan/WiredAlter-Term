@@ -106,5 +106,6 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           package: "wiredalter-term"
           keep: "^main$, ^dev$"
-          days: 30
+          days: 7
           dry_run: false
+        continue-on-error: true
