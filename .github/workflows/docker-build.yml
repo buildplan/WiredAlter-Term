@@ -101,7 +101,7 @@ jobs:
 
       # Cleanup
       - name: Clean up old GHCR images
-        uses: freke/github_docker_package_cleanup@v1.0.0-rc3
+        uses: freke/github_docker_package_cleanup@v1.0.0
         with:
           token: ${{ secrets.PAT_TOKEN }}
           package: "wiredalter-term"
