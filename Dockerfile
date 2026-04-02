@@ -21,7 +21,7 @@ RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
     cp node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js src/public/vendor/xterm/
 RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
     npx terser src/public/login.js -o src/public/login.js --compress --mangle && \
-    npx clean-css-cli -o src/public/style.css src/public/style.css
+    npx esbuild src/public/style.css --minify --outfile=src/public/style.css --allow-overwrite
 
 RUN npm prune --omit=dev
 
