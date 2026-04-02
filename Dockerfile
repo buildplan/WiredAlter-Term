@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.8.2-trixie-slim@sha256:04190ed2dee64158e96dd16bc6073fe6502eb3bc14be680b3e7463d048c797eb AS builder
+FROM node:25.9.0-trixie-slim@sha256:76d00a5baec72c6ade09b6254f35ef036087871f883d941bc00b2efbf4ab8a92 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
 
 RUN npm prune --omit=dev
 
-FROM node:25.8.2-trixie-slim@sha256:04190ed2dee64158e96dd16bc6073fe6502eb3bc14be680b3e7463d048c797eb
+FROM node:25.9.0-trixie-slim@sha256:76d00a5baec72c6ade09b6254f35ef036087871f883d941bc00b2efbf4ab8a92
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
