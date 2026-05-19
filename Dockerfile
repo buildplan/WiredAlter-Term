@@ -1,5 +1,5 @@
 # Use Node.js 25 on Debian 13
-FROM node:25.9.0-trixie-slim@sha256:76d00a5baec72c6ade09b6254f35ef036087871f883d941bc00b2efbf4ab8a92 AS builder
+FROM node:26.1.0-trixie-slim@sha256:424cafd2a035ed2b2d74acc3142b68b426fb62a47742c80a75e7117db02d6b30 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
 
 RUN npm prune --omit=dev
 
-FROM node:25.9.0-trixie-slim@sha256:76d00a5baec72c6ade09b6254f35ef036087871f883d941bc00b2efbf4ab8a92
+FROM node:26.1.0-trixie-slim@sha256:424cafd2a035ed2b2d74acc3142b68b426fb62a47742c80a75e7117db02d6b30
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
@@ -43,7 +43,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:29.5.0-cli /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.5.1-cli /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
