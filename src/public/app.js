@@ -295,10 +295,16 @@ class TerminalTab {
 
         this.tabElement = document.createElement('div');
         this.tabElement.className = 'tab';
-        this.tabElement.innerHTML = `
-            <span class="tab-title">${this.name}</span>
-            <span class="tab-close">✕</span>
-        `;
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'tab-title';
+        titleSpan.textContent = this.name;
+
+        const closeSpan = document.createElement('span');
+        closeSpan.className = 'tab-close';
+        closeSpan.textContent = '✕';
+
+        this.tabElement.appendChild(titleSpan);
+        this.tabElement.appendChild(closeSpan);
 
         this.tabElement.addEventListener('click', (e) => {
             if(!e.target.classList.contains('tab-close')) {
@@ -848,8 +854,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Handle clicking the virtual buttons
     document.querySelectorAll('.m-key').forEach(btn => {
-        btn.addEventListener('mousedown', (e) => e.preventDefault());
-        btn.addEventListener('click', (e) => {
+        const triggerAction = (e) => {
             e.preventDefault();
             const keyType = btn.getAttribute('data-key');
             const activeTab = window.tabManager ? window.tabManager.getActiveTab() : null;
@@ -869,7 +874,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
                 activeTab.term.focus();
             }
-        });
+        };
+        btn.addEventListener('touchend', triggerAction, { passive: false });
+        btn.addEventListener('click', triggerAction);
     });
 
     // Intercept actual typing to apply the Ctrl/Alt modifiers

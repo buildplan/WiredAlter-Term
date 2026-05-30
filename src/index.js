@@ -23,7 +23,16 @@ const io = new Server(httpServer);
 
 const PORT = process.env.PORT || 3939;
 const PIN = process.env.PIN || "123456";
+if (!process.env.PIN) {
+    console.warn("⚠️  WARNING: Using default PIN '123456'. Please set a secure PIN in your environment variables.");
+}
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+    sessionSecret = crypto.randomBytes(32).toString('hex');
+    console.warn("⚠️  WARNING: No SESSION_SECRET provided. Generating a random session secret. Existing sessions will be invalidated on restart.");
+}
 
 process.env.STARSHIP_CONFIG = join(process.env.HOME, '.config', 'starship.toml');
 
@@ -110,7 +119,7 @@ app.use(helmet({
     }
 }));
 
-app.use(session({
+const sessionMiddleware = session({
     store: new NativeSQLiteStore(),
     cookie: {
         secure: IS_PRODUCTION,
@@ -118,10 +127,13 @@ app.use(session({
         sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000
     },
-    secret: process.env.SESSION_SECRET || 'wired-alter-term-secret-key',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false
-}));
+});
+
+app.use(sessionMiddleware);
+io.engine.use(sessionMiddleware);
 
 app.use(express.json());
 
@@ -140,7 +152,11 @@ const generalLimiter = rateLimit({
     max: 300, // 300 requests per 15m
     standardHeaders: true,
     legacyHeaders: false,
-    message: "Too many requests. Please slow down."
+    message: "Too many requests. Please slow down.",
+    skip: (req) => {
+        const p = req.path;
+        return p.startsWith('/vendor') || p.startsWith('/fonts') || p.endsWith('.css') || p.endsWith('.js') || p === '/favicon.ico';
+    }
 });
 
 // Apply general limiter globally to all routes
@@ -152,11 +168,15 @@ const storage = multer.diskStorage({
         cb(null, DATA_DIR);
     },
     filename: (req, file, cb) => {
-        cb(null, file.originalname);
+        const safeName = file.originalname.replace(/^.*[\\\/]/, '');
+        cb(null, safeName || 'upload.bin');
     }
 });
 
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+});
 
 
 // --- 3. AUTHENTICATION ROUTES ---
@@ -168,7 +188,7 @@ app.get('/login', (req, res) => {
 
 // Use the stricter loginLimiter specifically for verification
 app.post('/verify-pin', loginLimiter, (req, res) => {
-    const { pin } = req.body;    
+    const { pin } = req.body;
     if (!pin || typeof pin !== 'string' || pin.length !== PIN.length) {
         return res.status(401).json({ error: "ACCESS DENIED: Invalid Passcode" });
     }
@@ -318,6 +338,13 @@ setupPersistence();
 
 // --- 6. TERMINAL LOGIC ---
 io.on('connection', (socket) => {
+    const req = socket.request;
+    if (!req.session || !req.session.authenticated) {
+        console.warn("Unauthorized WebSocket connection attempt.");
+        socket.disconnect(true);
+        return;
+    }
+
     const cleanEnv = { ...process.env, TERM: 'xterm-256color' };
     delete cleanEnv.TMUX;
     delete cleanEnv.TMUX_PANE;
@@ -330,7 +357,10 @@ io.on('connection', (socket) => {
     });
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
     ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect();});
-    socket.on('terminal:input', (data) => { try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }});
+    socket.on('terminal:input', (data) => {
+        if (typeof data !== 'string') return;
+        try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
+    });
     socket.on('terminal:resize', ({ cols, rows }) => {
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
