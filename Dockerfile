@@ -23,7 +23,13 @@ RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
     npx terser src/public/login.js -o src/public/login.js --compress --mangle && \
     npx esbuild src/public/style.css --minify --outfile=src/public/style.css --allow-overwrite
 
-RUN npm prune --omit=dev
+RUN npm prune --omit=dev && \
+    find node_modules -type f -name "*.o" -delete && \
+    find node_modules -type f -name "*.a" -delete && \
+    find node_modules -type f -name "*.cpp" -delete && \
+    find node_modules -type f -name "*.h" -delete && \
+    rm -rf node_modules/node-pty/prebuilds/darwin-* && \
+    rm -rf node_modules/node-pty/prebuilds/win32-*
 
 FROM node:26.2.0-trixie-slim@sha256:1e738cb88890a15c71880323fbc35a739b7bbc703d72e8bfd1613128f8182f78
 ARG DEBIAN_FRONTEND=noninteractive
@@ -74,7 +80,7 @@ RUN sed -i 's/^.*SendEnv LANG LC_.*$/#&/' /etc/ssh/ssh_config
 
 WORKDIR /app
 
-COPY --from=builder /app /app
+COPY --from=builder --chown=node:node /app /app
 
 # Setup Seed Directories & Download Font
 # renovate: datasource=github-tags depName=ryanoasis/nerd-fonts
@@ -87,7 +93,7 @@ RUN mkdir -p /usr/local/share/smart-term/defaults \
     "https://github.com/ryanoasis/nerd-fonts/raw/${NERDFONT_VERSION}/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf"
 
 # Configure Shell & Permissions
-RUN mkdir -p /data && chown -R node:node /app /data /home/node
+RUN mkdir -p /data && chown -R node:node /data /home/node
 
 # Setup Entrypoint & CLI (moved out of the copied /app directory to the system path)
 RUN cp /app/src/entrypoint.sh /usr/local/bin/ && \
