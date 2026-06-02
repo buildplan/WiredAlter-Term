@@ -11,6 +11,9 @@ import session from 'express-session';
 import BetterSqlite3 from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
+import compression from 'compression';
+import os from 'os';
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
@@ -50,7 +53,12 @@ db.exec(`
     sid TEXT PRIMARY KEY,
     data TEXT,
     expiresAt INTEGER
-  )
+  );
+  CREATE TABLE IF NOT EXISTS passkeys (
+    id TEXT PRIMARY KEY,
+    publicKey TEXT,
+    counter INTEGER
+  );
 `);
 
 // --- 1. SESSION STORE ---
@@ -135,6 +143,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
+app.use(compression());
 app.use(express.json());
 
 // Strict Limiter for Login (Brute Force Protection)
@@ -163,9 +172,14 @@ const generalLimiter = rateLimit({
 app.use(generalLimiter);
 
 // --- UPLOAD CONFIGURATION ---
+const UPLOADS_DIR = join(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, DATA_DIR);
+        cb(null, UPLOADS_DIR);
     },
     filename: (req, file, cb) => {
         const safeName = file.originalname.replace(/^.*[\\\/]/, '');
@@ -211,6 +225,90 @@ app.get('/logout', (req, res) => {
     });
 });
 
+// --- WEBAUTHN (PASSKEYS) ---
+const rpName = 'WiredTerm';
+const rpID = process.env.RP_ID || 'localhost';
+const origin = process.env.ORIGIN || `http://localhost:${PORT}`;
+
+app.get('/webauthn/register-options', (req, res) => {
+    if (!req.session.authenticated) return res.status(401).json({ error: "Must be logged in to register passkey" });
+    const options = generateRegistrationOptions({
+        rpName,
+        rpID,
+        userID: new Uint8Array(Buffer.from("admin_user")),
+        userName: "admin",
+        attestationType: 'none',
+        authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+    });
+    req.session.currentChallenge = options.challenge;
+    res.json(options);
+});
+
+app.post('/webauthn/register-verify', async (req, res) => {
+    if (!req.session.authenticated) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        const verification = await verifyRegistrationResponse({
+            response: req.body,
+            expectedChallenge: req.session.currentChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpID,
+        });
+        if (verification.verified && verification.registrationInfo) {
+            const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+            // credentialPublicKey is Uint8Array in v10+, store as base64
+            const pk = Buffer.from(credentialPublicKey).toString('base64');
+            db.prepare('INSERT INTO passkeys (id, publicKey, counter) VALUES (?, ?, ?)').run(
+                req.body.id, pk, counter
+            );
+            res.json({ success: true });
+        } else {
+            res.status(400).json({ success: false });
+        }
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/webauthn/auth-options', (req, res) => {
+    const passkeys = db.prepare('SELECT id FROM passkeys').all();
+    if (passkeys.length === 0) return res.status(400).json({ error: "No passkeys registered" });
+    const options = generateAuthenticationOptions({
+        rpID,
+        allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
+        userVerification: 'preferred',
+    });
+    req.session.currentChallenge = options.challenge;
+    res.json(options);
+});
+
+app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
+    const passkey = db.prepare('SELECT * FROM passkeys WHERE id = ?').get(req.body.id);
+    if (!passkey) return res.status(400).json({ error: "Passkey not found" });
+
+    try {
+        const verification = await verifyAuthenticationResponse({
+            response: req.body,
+            expectedChallenge: req.session.currentChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpID,
+            authenticator: {
+                credentialID: passkey.id,
+                credentialPublicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
+                counter: passkey.counter,
+            },
+        });
+        if (verification.verified) {
+            db.prepare('UPDATE passkeys SET counter = ? WHERE id = ?').run(verification.authenticationInfo.newCounter, passkey.id);
+            req.session.authenticated = true;
+            req.session.save(() => { res.json({ success: true }); });
+        } else {
+            res.status(400).json({ success: false });
+        }
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Auth Guard Middleware
 const requireAuth = (req, res, next) => {
     const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico'];
@@ -241,8 +339,18 @@ app.post('/upload', upload.array('files'), (req, res) => {
                 : 'unknown_file';
         })
         .join(', ');
-    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
+    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
     res.json({ success: true, count: req.files.length });
+});
+
+// Download Handler
+app.get('/download', (req, res) => {
+    const fileName = req.query.file;
+    if (!fileName || typeof fileName !== 'string') return res.status(400).send('File required');
+    const safePath = join(DATA_DIR, fileName);
+    if (!safePath.startsWith(DATA_DIR)) return res.status(403).send('Forbidden');
+    if (!fs.existsSync(safePath)) return res.status(404).send('File not found');
+    res.download(safePath);
 });
 
 // Logging & Favicon
@@ -368,6 +476,18 @@ io.on('connection', (socket) => {
             catch (err) { console.warn('Resize failed:', err.message); }});
     socket.on('disconnect', () => ptyProcess.kill());
     socket.on('latency:ping', (timestamp) => { socket.emit('latency:pong', timestamp); });
+    
+    // Telemetry handler
+    socket.on('telemetry:request', () => {
+        const freeMem = os.freemem();
+        const totalMem = os.totalmem();
+        const loadAvg = os.loadavg();
+        socket.emit('telemetry:update', {
+            cpu: (loadAvg[0]).toFixed(2), // 1 min load avg
+            mem: (((totalMem - freeMem) / totalMem) * 100).toFixed(1),
+            totalMem: (totalMem / 1024 / 1024 / 1024).toFixed(1)
+        });
+    });
 });
 
 // --- EXPORT FOR TESTING ---

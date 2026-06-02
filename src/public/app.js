@@ -953,3 +953,61 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 });
+
+// --- Passkey, Download, and Telemetry Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Download
+    const downloadBtn = document.getElementById('download-btn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            const fileName = prompt('Enter the name of the file to download from /data:');
+            if (fileName) {
+                window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
+            }
+        });
+    }
+
+    // 2. Passkey Registration
+    const passkeyBtn = document.getElementById('passkey-register-btn');
+    if (passkeyBtn) {
+        passkeyBtn.addEventListener('click', async () => {
+            try {
+                if (!window.SimpleWebAuthnBrowser) return alert('WebAuthn library not loaded.');
+                const { startRegistration } = window.SimpleWebAuthnBrowser;
+                const resp = await fetch('/webauthn/register-options');
+                if (!resp.ok) {
+                    const errData = await resp.json();
+                    throw new Error(errData.error || 'Failed to get registration options');
+                }
+                const options = await resp.json();
+                const attResp = await startRegistration(options);
+                const verificationResp = await fetch('/webauthn/register-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(attResp)
+                });
+                const verification = await verificationResp.json();
+                if (verification.success) {
+                    alert('Passkey registered successfully! You can now use it to login.');
+                } else {
+                    alert('Passkey registration failed.');
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        });
+    }
+
+    // 3. Telemetry
+    const telemetrySocket = io();
+    setInterval(() => {
+        telemetrySocket.emit('telemetry:request');
+    }, 3000);
+    telemetrySocket.on('telemetry:update', (data) => {
+        const display = document.getElementById('telemetry-display');
+        if (display) {
+            display.textContent = `~ CPU: ${data.cpu} | RAM: ${data.mem}% of ${data.totalMem}GB`;
+        }
+    });
+    setTimeout(() => telemetrySocket.emit('telemetry:request'), 1000);
+});
