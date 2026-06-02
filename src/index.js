@@ -72,7 +72,7 @@ class NativeSQLiteStore extends session.Store {
         this.clearStmt = db.prepare('DELETE FROM sessions WHERE expiresAt <= ?');
 
         setInterval(() => {
-            try { this.clearStmt.run(Date.now()); } catch(e) { console.error('Session cleanup error:', e); }
+            try { this.clearStmt.run(Date.now()); } catch (e) { console.error('Session cleanup error:', e); }
         }, 15 * 60 * 1000).unref();
     }
 
@@ -101,7 +101,7 @@ class NativeSQLiteStore extends session.Store {
             const expires = sessionData.cookie?.expires ? new Date(sessionData.cookie.expires).getTime() : Date.now() + 86400000;
             this.touchStmt.run(expires, sid);
             if (cb) cb(null);
-        } catch (err) { if(cb) cb(err); }
+        } catch (err) { if (cb) cb(err); }
     }
 }
 
@@ -230,20 +230,24 @@ const rpName = 'WiredTerm';
 const rpID = process.env.RP_ID || 'localhost';
 const origin = process.env.ORIGIN || `http://localhost:${PORT}`;
 
-app.get('/webauthn/register-options', (req, res) => {
+app.get('/webauthn/register-options', async (req, res) => {
     if (!req.session.authenticated) return res.status(401).json({ error: "Must be logged in to register passkey" });
-    const options = generateRegistrationOptions({
-        rpName,
-        rpID,
-        userID: new Uint8Array(Buffer.from("admin_user")),
-        userName: "admin",
-        attestationType: 'none',
-        authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
-    });
-    req.session.currentChallenge = options.challenge;
-    req.session.save(() => {
-        res.json(options);
-    });
+    try {
+        const options = await generateRegistrationOptions({
+            rpName,
+            rpID,
+            userID: new Uint8Array(Buffer.from("admin_user")),
+            userName: "admin",
+            attestationType: 'none',
+            authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+        });
+        req.session.currentChallenge = options.challenge;
+        req.session.save(() => {
+            res.json(options);
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/webauthn/register-verify', async (req, res) => {
@@ -271,18 +275,22 @@ app.post('/webauthn/register-verify', async (req, res) => {
     }
 });
 
-app.get('/webauthn/auth-options', (req, res) => {
+app.get('/webauthn/auth-options', async (req, res) => {
     const passkeys = db.prepare('SELECT id FROM passkeys').all();
     if (passkeys.length === 0) return res.status(400).json({ error: "No passkeys registered" });
-    const options = generateAuthenticationOptions({
-        rpID,
-        allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
-        userVerification: 'preferred',
-    });
-    req.session.currentChallenge = options.challenge;
-    req.session.save(() => {
-        res.json(options);
-    });
+    try {
+        const options = await generateAuthenticationOptions({
+            rpID,
+            allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
+            userVerification: 'preferred',
+        });
+        req.session.currentChallenge = options.challenge;
+        req.session.save(() => {
+            res.json(options);
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
@@ -468,7 +476,7 @@ io.on('connection', (socket) => {
         env: cleanEnv
     });
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
-    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect();});
+    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect(); });
     socket.on('terminal:input', (data) => {
         if (typeof data !== 'string') return;
         try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
@@ -477,10 +485,11 @@ io.on('connection', (socket) => {
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
         try { ptyProcess.resize(safeCols, safeRows); }
-            catch (err) { console.warn('Resize failed:', err.message); }});
+        catch (err) { console.warn('Resize failed:', err.message); }
+    });
     socket.on('disconnect', () => ptyProcess.kill());
     socket.on('latency:ping', (timestamp) => { socket.emit('latency:pong', timestamp); });
-    
+
     // Telemetry handler
     socket.on('telemetry:request', () => {
         const freeMem = os.freemem();
