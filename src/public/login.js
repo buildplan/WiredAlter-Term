@@ -69,4 +69,39 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    const passkeyBtn = document.getElementById('passkeyBtn');
+    if (passkeyBtn) {
+        passkeyBtn.addEventListener('click', async () => {
+            const { startAuthentication } = window.SimpleWebAuthnBrowser;
+            feedback.textContent = "WAITING FOR PASSKEY...";
+            feedback.style.color = "#e0af68";
+            try {
+                const resp = await fetch('/webauthn/auth-options');
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.error || 'No passkeys found');
+                }
+                const options = await resp.json();
+                const asseResp = await startAuthentication(options);
+                const verificationResp = await fetch('/webauthn/auth-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(asseResp)
+                });
+                const verification = await verificationResp.json();
+                if (verification.success) {
+                    feedback.textContent = "ACCESS GRANTED";
+                    feedback.style.color = "#9ece6a";
+                    setTimeout(() => window.location.href = '/', 500);
+                } else {
+                    feedback.textContent = "PASSKEY REJECTED";
+                    feedback.style.color = "#ff5555";
+                }
+            } catch (e) {
+                feedback.textContent = e.message || "SYSTEM ERROR";
+                feedback.style.color = "#ff5555";
+            }
+        });
+    }
 });

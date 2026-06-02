@@ -9,8 +9,9 @@ COPY package.json package-lock.json* ./
 RUN npm install
 
 COPY . .
-RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs && \
+RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs src/public/vendor/simplewebauthn && \
     cp node_modules/sortablejs/Sortable.min.js src/public/vendor/sortablejs/ && \
+    cp node_modules/@simplewebauthn/browser/dist/bundle/index.umd.min.js src/public/vendor/simplewebauthn/ && \
     cp node_modules/@xterm/xterm/css/xterm.css src/public/vendor/xterm/ && \
     cp node_modules/@xterm/xterm/lib/xterm.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-fit/lib/addon-fit.js src/public/vendor/xterm/ && \

@@ -11,6 +11,9 @@ import session from 'express-session';
 import BetterSqlite3 from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
+import compression from 'compression';
+import os from 'os';
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
@@ -50,7 +53,12 @@ db.exec(`
     sid TEXT PRIMARY KEY,
     data TEXT,
     expiresAt INTEGER
-  )
+  );
+  CREATE TABLE IF NOT EXISTS passkeys (
+    id TEXT PRIMARY KEY,
+    publicKey TEXT,
+    counter INTEGER
+  );
 `);
 
 // --- 1. SESSION STORE ---
@@ -64,7 +72,7 @@ class NativeSQLiteStore extends session.Store {
         this.clearStmt = db.prepare('DELETE FROM sessions WHERE expiresAt <= ?');
 
         setInterval(() => {
-            try { this.clearStmt.run(Date.now()); } catch(e) { console.error('Session cleanup error:', e); }
+            try { this.clearStmt.run(Date.now()); } catch (e) { console.error('Session cleanup error:', e); }
         }, 15 * 60 * 1000).unref();
     }
 
@@ -93,7 +101,7 @@ class NativeSQLiteStore extends session.Store {
             const expires = sessionData.cookie?.expires ? new Date(sessionData.cookie.expires).getTime() : Date.now() + 86400000;
             this.touchStmt.run(expires, sid);
             if (cb) cb(null);
-        } catch (err) { if(cb) cb(err); }
+        } catch (err) { if (cb) cb(err); }
     }
 }
 
@@ -135,6 +143,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
+app.use(compression());
 app.use(express.json());
 
 // Strict Limiter for Login (Brute Force Protection)
@@ -163,9 +172,14 @@ const generalLimiter = rateLimit({
 app.use(generalLimiter);
 
 // --- UPLOAD CONFIGURATION ---
+const UPLOADS_DIR = join(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, DATA_DIR);
+        cb(null, UPLOADS_DIR);
     },
     filename: (req, file, cb) => {
         const safeName = file.originalname.replace(/^.*[\\\/]/, '');
@@ -211,6 +225,107 @@ app.get('/logout', (req, res) => {
     });
 });
 
+// --- WEBAUTHN (PASSKEYS) ---
+const rpName = 'WiredTerm';
+
+const getRpID = (req) => process.env.RP_ID || req.hostname;
+const getOrigin = (req) => {
+    if (process.env.ORIGIN) return process.env.ORIGIN;
+    if (req.headers.origin) return req.headers.origin;
+    return `${req.protocol}://${req.get('host')}`;
+};
+
+app.get('/webauthn/register-options', async (req, res) => {
+    if (!req.session.authenticated) return res.status(401).json({ error: "Must be logged in to register passkey" });
+    try {
+        const options = await generateRegistrationOptions({
+            rpName,
+            rpID: getRpID(req),
+            userID: new Uint8Array(Buffer.from("admin_user")),
+            userName: "admin",
+            attestationType: 'none',
+            authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+        });
+        req.session.currentChallenge = options.challenge;
+        req.session.save(() => {
+            res.json(options);
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/webauthn/register-verify', async (req, res) => {
+    if (!req.session.authenticated) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        const verification = await verifyRegistrationResponse({
+            response: req.body,
+            expectedChallenge: req.session.currentChallenge,
+            expectedOrigin: getOrigin(req),
+            expectedRPID: getRpID(req),
+        });
+        if (verification.verified && verification.registrationInfo) {
+            const { credential } = verification.registrationInfo;
+            // credential.publicKey is Uint8Array in v10+, store as base64
+            const pk = Buffer.from(credential.publicKey).toString('base64');
+            db.prepare('INSERT INTO passkeys (id, publicKey, counter) VALUES (?, ?, ?)').run(
+                credential.id, pk, credential.counter
+            );
+            res.json({ success: true });
+        } else {
+            res.status(400).json({ success: false });
+        }
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/webauthn/auth-options', async (req, res) => {
+    const passkeys = db.prepare('SELECT id FROM passkeys').all();
+    if (passkeys.length === 0) return res.status(400).json({ error: "No passkeys registered" });
+    try {
+        const options = await generateAuthenticationOptions({
+            rpID: getRpID(req),
+            allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
+            userVerification: 'preferred',
+        });
+        req.session.currentChallenge = options.challenge;
+        req.session.save(() => {
+            res.json(options);
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
+    const passkey = db.prepare('SELECT * FROM passkeys WHERE id = ?').get(req.body.id);
+    if (!passkey) return res.status(400).json({ error: "Passkey not found" });
+
+    try {
+        const verification = await verifyAuthenticationResponse({
+            response: req.body,
+            expectedChallenge: req.session.currentChallenge,
+            expectedOrigin: getOrigin(req),
+            expectedRPID: getRpID(req),
+            credential: {
+                id: passkey.id,
+                publicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
+                counter: passkey.counter,
+            },
+        });
+        if (verification.verified) {
+            db.prepare('UPDATE passkeys SET counter = ? WHERE id = ?').run(verification.authenticationInfo.newCounter, passkey.id);
+            req.session.authenticated = true;
+            req.session.save(() => { res.json({ success: true }); });
+        } else {
+            res.status(400).json({ success: false });
+        }
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Auth Guard Middleware
 const requireAuth = (req, res, next) => {
     const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico'];
@@ -241,8 +356,18 @@ app.post('/upload', upload.array('files'), (req, res) => {
                 : 'unknown_file';
         })
         .join(', ');
-    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data: ${fileList}\x1b[0m\r\n`);
+    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
     res.json({ success: true, count: req.files.length });
+});
+
+// Download Handler
+app.get('/download', (req, res) => {
+    const fileName = req.query.file;
+    if (!fileName || typeof fileName !== 'string') return res.status(400).send('File required');
+    const safePath = join(DATA_DIR, fileName);
+    if (!safePath.startsWith(DATA_DIR)) return res.status(403).send('Forbidden');
+    if (!fs.existsSync(safePath)) return res.status(404).send('File not found');
+    res.download(safePath);
 });
 
 // Logging & Favicon
@@ -356,7 +481,7 @@ io.on('connection', (socket) => {
         env: cleanEnv
     });
     ptyProcess.onData((data) => socket.emit('terminal:output', data));
-    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect();});
+    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect(); });
     socket.on('terminal:input', (data) => {
         if (typeof data !== 'string') return;
         try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
@@ -365,9 +490,22 @@ io.on('connection', (socket) => {
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
         try { ptyProcess.resize(safeCols, safeRows); }
-            catch (err) { console.warn('Resize failed:', err.message); }});
+        catch (err) { console.warn('Resize failed:', err.message); }
+    });
     socket.on('disconnect', () => ptyProcess.kill());
     socket.on('latency:ping', (timestamp) => { socket.emit('latency:pong', timestamp); });
+
+    // Telemetry handler
+    socket.on('telemetry:request', () => {
+        const freeMem = os.freemem();
+        const totalMem = os.totalmem();
+        const loadAvg = os.loadavg();
+        socket.emit('telemetry:update', {
+            cpu: (loadAvg[0]).toFixed(2), // 1 min load avg
+            mem: (((totalMem - freeMem) / totalMem) * 100).toFixed(1),
+            totalMem: (totalMem / 1024 / 1024 / 1024).toFixed(1)
+        });
+    });
 });
 
 // --- EXPORT FOR TESTING ---

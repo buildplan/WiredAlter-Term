@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="style.css?v=2">
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
+    <script src="/vendor/simplewebauthn/index.umd.min.js"></script>
     <script>
         (function() {
             const storedTheme = localStorage.getItem('wired-term-theme');
@@ -80,6 +81,10 @@
                 </div>
                 <div id="feedbackMsg" class="feedback"></div>
             </form>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <button type="button" id="passkeyBtn" style="background: none; border: 1px solid #58a6ff; color: #58a6ff; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-family: monospace;">Login with Passkey</button>
+            </div>
         </div>
     </div>
 
