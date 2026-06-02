@@ -587,7 +587,8 @@ html.light .custom-modal::backdrop {
     .header { padding: 5px 10px; }
     .title-details,
     .status-text,
-    .btn-text { display: none; }
+    .btn-text,
+    #telemetry-display { display: none; }
     .title { font-size: 1rem; }
     .status { font-size: 1.2rem; }
     .logout-btn { padding: 5px 8px; font-size: 1rem; }
