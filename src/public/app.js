@@ -956,11 +956,69 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- Passkey, Download, and Telemetry Logic ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Custom Dialog Helpers
+    function showCustomAlert(message, title = "Message") {
+        return new Promise(resolve => {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('custom-modal-title').textContent = title;
+            document.getElementById('custom-modal-text').textContent = message;
+            document.getElementById('custom-modal-input-container').style.display = 'none';
+            document.getElementById('custom-modal-cancel').style.display = 'none';
+            
+            const okBtn = document.getElementById('custom-modal-ok');
+            const cleanup = () => {
+                okBtn.removeEventListener('click', onOk);
+                modal.close();
+                resolve();
+            };
+            const onOk = () => cleanup();
+            okBtn.addEventListener('click', onOk);
+            modal.showModal();
+        });
+    }
+
+    function showCustomPrompt(message, title = "Input Required") {
+        return new Promise(resolve => {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('custom-modal-title').textContent = title;
+            document.getElementById('custom-modal-text').textContent = message;
+            const inputContainer = document.getElementById('custom-modal-input-container');
+            const inputField = document.getElementById('custom-modal-input');
+            inputContainer.style.display = 'block';
+            inputField.value = '';
+            
+            const cancelBtn = document.getElementById('custom-modal-cancel');
+            cancelBtn.style.display = 'inline-flex';
+            const okBtn = document.getElementById('custom-modal-ok');
+            
+            const cleanup = (val) => {
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                inputField.removeEventListener('keydown', onKey);
+                modal.close();
+                resolve(val);
+            };
+            const onOk = () => cleanup(inputField.value);
+            const onCancel = () => cleanup(null);
+            const onKey = (e) => {
+                if (e.key === 'Enter') onOk();
+                if (e.key === 'Escape') onCancel();
+            };
+            
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            inputField.addEventListener('keydown', onKey);
+            
+            modal.showModal();
+            inputField.focus();
+        });
+    }
+
     // 1. Download
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
-        downloadBtn.addEventListener('click', () => {
-            const fileName = prompt('Enter the name of the file to download from /data:');
+        downloadBtn.addEventListener('click', async () => {
+            const fileName = await showCustomPrompt('Enter the name of the file to download from /data:', 'Download File');
             if (fileName) {
                 window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
             }
@@ -972,7 +1030,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (passkeyBtn) {
         passkeyBtn.addEventListener('click', async () => {
             try {
-                if (!window.SimpleWebAuthnBrowser) return alert('WebAuthn library not loaded.');
+                if (!window.SimpleWebAuthnBrowser) {
+                    await showCustomAlert('WebAuthn library not loaded.', 'Error');
+                    return;
+                }
                 const { startRegistration } = window.SimpleWebAuthnBrowser;
                 const resp = await fetch('/webauthn/register-options');
                 if (!resp.ok) {
@@ -988,12 +1049,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const verification = await verificationResp.json();
                 if (verification.success) {
-                    alert('Passkey registered successfully! You can now use it to login.');
+                    await showCustomAlert('Passkey registered successfully! You can now use it to login.', 'Success');
                 } else {
-                    alert('Passkey registration failed.');
+                    await showCustomAlert('Passkey registration failed.', 'Error');
                 }
             } catch (e) {
-                alert('Error: ' + e.message);
+                await showCustomAlert(e.message, 'Error');
             }
         });
     }

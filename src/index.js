@@ -227,15 +227,20 @@ app.get('/logout', (req, res) => {
 
 // --- WEBAUTHN (PASSKEYS) ---
 const rpName = 'WiredTerm';
-const rpID = process.env.RP_ID || 'localhost';
-const origin = process.env.ORIGIN || `http://localhost:${PORT}`;
+
+const getRpID = (req) => process.env.RP_ID || req.hostname;
+const getOrigin = (req) => {
+    if (process.env.ORIGIN) return process.env.ORIGIN;
+    if (req.headers.origin) return req.headers.origin;
+    return `${req.protocol}://${req.get('host')}`;
+};
 
 app.get('/webauthn/register-options', async (req, res) => {
     if (!req.session.authenticated) return res.status(401).json({ error: "Must be logged in to register passkey" });
     try {
         const options = await generateRegistrationOptions({
             rpName,
-            rpID,
+            rpID: getRpID(req),
             userID: new Uint8Array(Buffer.from("admin_user")),
             userName: "admin",
             attestationType: 'none',
@@ -256,8 +261,8 @@ app.post('/webauthn/register-verify', async (req, res) => {
         const verification = await verifyRegistrationResponse({
             response: req.body,
             expectedChallenge: req.session.currentChallenge,
-            expectedOrigin: origin,
-            expectedRPID: rpID,
+            expectedOrigin: getOrigin(req),
+            expectedRPID: getRpID(req),
         });
         if (verification.verified && verification.registrationInfo) {
             const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
@@ -280,7 +285,7 @@ app.get('/webauthn/auth-options', async (req, res) => {
     if (passkeys.length === 0) return res.status(400).json({ error: "No passkeys registered" });
     try {
         const options = await generateAuthenticationOptions({
-            rpID,
+            rpID: getRpID(req),
             allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
             userVerification: 'preferred',
         });
@@ -301,8 +306,8 @@ app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
         const verification = await verifyAuthenticationResponse({
             response: req.body,
             expectedChallenge: req.session.currentChallenge,
-            expectedOrigin: origin,
-            expectedRPID: rpID,
+            expectedOrigin: getOrigin(req),
+            expectedRPID: getRpID(req),
             authenticator: {
                 credentialID: passkey.id,
                 credentialPublicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),

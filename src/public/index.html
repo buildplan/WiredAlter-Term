@@ -159,6 +159,20 @@
         </div>
     </div>
 
+    <dialog id="custom-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <h3 id="custom-modal-title" style="margin-top: 0; color: var(--text-title);">Message</h3>
+            <p id="custom-modal-text" style="color: var(--text-main); margin-bottom: 0;"></p>
+            <div id="custom-modal-input-container" style="display: none; margin-top: 15px;">
+                <input type="text" id="custom-modal-input" style="width: 100%; box-sizing: border-box; background: var(--term-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px; outline: none; font-family: inherit;" />
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="custom-modal-cancel" class="icon-btn" style="display: none;">Cancel</button>
+                <button id="custom-modal-ok" class="icon-btn" style="background: var(--text-title); color: #fff; border-color: var(--text-title);">OK</button>
+            </div>
+        </div>
+    </dialog>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/vendor/simplewebauthn/index.umd.min.js"></script>
     <script src="app.js?v=4.0"></script>
