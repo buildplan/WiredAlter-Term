@@ -241,7 +241,9 @@ app.get('/webauthn/register-options', (req, res) => {
         authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
     });
     req.session.currentChallenge = options.challenge;
-    res.json(options);
+    req.session.save(() => {
+        res.json(options);
+    });
 });
 
 app.post('/webauthn/register-verify', async (req, res) => {
@@ -278,7 +280,9 @@ app.get('/webauthn/auth-options', (req, res) => {
         userVerification: 'preferred',
     });
     req.session.currentChallenge = options.challenge;
-    res.json(options);
+    req.session.save(() => {
+        res.json(options);
+    });
 });
 
 app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
