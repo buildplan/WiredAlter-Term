@@ -265,11 +265,11 @@ app.post('/webauthn/register-verify', async (req, res) => {
             expectedRPID: getRpID(req),
         });
         if (verification.verified && verification.registrationInfo) {
-            const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
-            // credentialPublicKey is Uint8Array in v10+, store as base64
-            const pk = Buffer.from(credentialPublicKey).toString('base64');
+            const { credential } = verification.registrationInfo;
+            // credential.publicKey is Uint8Array in v10+, store as base64
+            const pk = Buffer.from(credential.publicKey).toString('base64');
             db.prepare('INSERT INTO passkeys (id, publicKey, counter) VALUES (?, ?, ?)').run(
-                req.body.id, pk, counter
+                credential.id, pk, credential.counter
             );
             res.json({ success: true });
         } else {
@@ -308,9 +308,9 @@ app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
             expectedChallenge: req.session.currentChallenge,
             expectedOrigin: getOrigin(req),
             expectedRPID: getRpID(req),
-            authenticator: {
-                credentialID: passkey.id,
-                credentialPublicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
+            credential: {
+                id: passkey.id,
+                publicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
                 counter: passkey.counter,
             },
         });
