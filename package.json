@@ -19,7 +19,7 @@
     "url": "https://github.com/buildplan/WiredAlter-Term/issues"
   },
   "engines": {
-    "node": ">=25.9.0"
+    "node": ">=26.3.0"
   },
   "scripts": {
     "start": "node src/index.js",
