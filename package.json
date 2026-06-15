@@ -27,6 +27,8 @@
     "test": "NODE_ENV=test node --test"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-serialize": "^0.14.0",
@@ -34,22 +36,23 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
+    "compression": "^1.8.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
     "helmet": "^8.2.0",
-    "multer": "^2.1.1",
+    "multer": "^2.2.0",
     "node-pty": "^1.1.0",
     "socket.io": "^4.8.3",
-    "sortablejs": "^1.15.7",
-    "compression": "^1.8.1",
-    "@simplewebauthn/server": "^13.3.1",
-    "@simplewebauthn/browser": "^13.3.0"
+    "sortablejs": "^1.15.7"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",
     "supertest": "^7.2.2",
     "terser": "^5.48.0"
+  },
+  "overrides": {
+    "ws": "^8.21.0"
   }
 }
