@@ -1,5 +1,5 @@
-# Use Node.js 25 on Debian 13
-FROM node:26.3.0-trixie-slim@sha256:95a34da32a840bd9b3b09a5b773591c16923e350174b1c50e1200c75bf15eaa9 AS builder
+# Use Node.js 26 on Debian 13
+FROM node:26.3.1-trixie-slim@sha256:191ef878ecb351d68b78219593de18bd8942afd59af59f29960dc4b24805a3f1 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm prune --omit=dev && \
     rm -rf node_modules/node-pty/prebuilds/darwin-* && \
     rm -rf node_modules/node-pty/prebuilds/win32-*
 
-FROM node:26.3.0-trixie-slim@sha256:95a34da32a840bd9b3b09a5b773591c16923e350174b1c50e1200c75bf15eaa9
+FROM node:26.3.1-trixie-slim@sha256:191ef878ecb351d68b78219593de18bd8942afd59af59f29960dc4b24805a3f1
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
@@ -50,7 +50,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:29.5.3-cli /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.5.3-cli@sha256:873de13208aab9c1de73fe984fd45883e01464fcfcc85efa20aa56a9ccfe7aa6 /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
@@ -117,3 +117,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "src/index.js"]
+
