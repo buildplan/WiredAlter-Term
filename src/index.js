@@ -208,7 +208,7 @@ app.get('/login', (req, res) => {
 // Use the stricter loginLimiter specifically for verification
 app.post('/verify-pin', loginLimiter, (req, res) => {
     const dbDisablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
-    const isPinDisabled = DISABLE_PIN || (dbDisablePin && dbDisablePin.value === 'true');
+    const isPinDisabled = DISABLE_PIN || (dbDisablePin ? dbDisablePin.value === 'true' : false);
 
     if (isPinDisabled) {
         return res.status(403).json({ error: "PIN LOGIN DISABLED" });
@@ -230,7 +230,7 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
 
 app.get('/auth-methods', (req, res) => {
     const dbDisablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
-    const isPinDisabled = DISABLE_PIN || (dbDisablePin && dbDisablePin.value === 'true');
+    const isPinDisabled = DISABLE_PIN || (dbDisablePin ? dbDisablePin.value === 'true' : false);
     res.json({ disablePin: isPinDisabled });
 });
 
