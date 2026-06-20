@@ -46,6 +46,7 @@ services:
     environment:
       - NODE_ENV=production
       - PIN=324252             # <--- Change this
+      - DISABLE_PIN=false      # Set to 'true' to disable PIN login (use passkey only)
       - SESSION_SECRET=sup3r_s3cr3t_k3y_chang3_m3 # <--- Change this
 
       - DOCKER_HOST=tcp://docker-proxy:2375 # this lets terminal use proxy above to manage Docker on host

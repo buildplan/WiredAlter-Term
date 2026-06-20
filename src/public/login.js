@@ -30,9 +30,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedback = document.getElementById('feedbackMsg');
     const cursor = document.getElementById('fakeCursor');
 
+    fetch('/auth-methods').then(r => r.json()).then(data => {
+        if (data.disablePin) {
+            const wrapper = document.querySelector('.input-wrapper');
+            if (wrapper) wrapper.style.display = 'none';
+            feedback.textContent = "PIN LOGIN DISABLED. USE PASSKEY.";
+            feedback.style.color = "#58a6ff";
+        }
+    }).catch(err => console.error("Could not fetch auth methods", err));
+
     document.addEventListener('click', (e) => {
         if (e.target.closest('#theme-btn')) return;
-        input.focus();
+        if (input && document.querySelector('.input-wrapper').style.display !== 'none') {
+            input.focus();
+        }
     });
 
     // Handle Enter Key

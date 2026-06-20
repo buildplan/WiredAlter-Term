@@ -26,6 +26,12 @@ describe('WiredAlter-Term Full Suite', () => {
         assert.strictEqual(response.header.location, '/login');
     });
 
+    it('GET /auth-methods should return auth config', async () => {
+        const response = await agent.get('/auth-methods');
+        assert.strictEqual(response.status, 200);
+        assert.strictEqual(typeof response.body.disablePin, 'boolean');
+    });
+
     // --- 2. AUTHENTICATION LOGIC ---
 
     it('POST /verify-pin should reject WRONG pin', async () => {

@@ -1014,6 +1014,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function showCustomConfirm(message, title = "Confirm") {
+        return new Promise(resolve => {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('custom-modal-title').textContent = title;
+            document.getElementById('custom-modal-text').textContent = message;
+            document.getElementById('custom-modal-input-container').style.display = 'none';
+            
+            const cancelBtn = document.getElementById('custom-modal-cancel');
+            cancelBtn.style.display = 'inline-flex';
+            const okBtn = document.getElementById('custom-modal-ok');
+            okBtn.textContent = 'Yes';
+            cancelBtn.textContent = 'No';
+            
+            const cleanup = (val) => {
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                okBtn.textContent = 'OK';
+                cancelBtn.textContent = 'Cancel';
+                modal.close();
+                resolve(val);
+            };
+            const onOk = () => cleanup(true);
+            const onCancel = () => cleanup(false);
+            
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            
+            modal.showModal();
+        });
+    }
+
     // 1. Download
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
@@ -1049,9 +1080,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const verification = await verificationResp.json();
                 if (verification.success) {
-                    await showCustomAlert('Passkey registered successfully! You can now use it to login.', 'Success');
+                    const wantsToDisable = await showCustomConfirm('Passkey registered! Do you want to disable PIN login and use passkeys only?', 'Success');
+                    if (wantsToDisable) {
+                        await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ disablePin: true })
+                        });
+                        await showCustomAlert('PIN login is now disabled.', 'Settings Updated');
+                    } else {
+                        await showCustomAlert('Passkey registered successfully.', 'Success');
+                    }
                 } else {
                     await showCustomAlert('Passkey registration failed.', 'Error');
+                }
+            } catch (e) {
+                await showCustomAlert(e.message, 'Error');
+            }
+        });
+    }
+
+    // 2b. Security Settings
+    const securityBtn = document.getElementById('security-settings-btn');
+    if (securityBtn) {
+        securityBtn.addEventListener('click', async () => {
+            try {
+                const resp = await fetch('/api/settings');
+                const settings = await resp.json();
+                
+                if (settings.envDisablePin) {
+                    await showCustomAlert('PIN login is completely disabled via environment variable (DISABLE_PIN=true).', 'Security Settings');
+                    return;
+                }
+                
+                const currentStatus = settings.disablePin ? 'DISABLED' : 'ENABLED';
+                const actionText = settings.disablePin ? 'Enable' : 'Disable';
+                
+                const confirmChange = await showCustomConfirm(`PIN login is currently ${currentStatus}.\n\nDo you want to ${actionText} PIN login?`, 'Security Settings');
+                if (confirmChange) {
+                    const newStatus = !settings.disablePin;
+                    await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ disablePin: newStatus })
+                    });
+                    await showCustomAlert(`PIN login is now ${newStatus ? 'DISABLED' : 'ENABLED'}.`, 'Settings Updated');
                 }
             } catch (e) {
                 await showCustomAlert(e.message, 'Error');
