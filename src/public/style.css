@@ -617,25 +617,84 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
 html.light .custom-modal::backdrop {
     background: rgba(255, 255, 255, 0.4);
 }
+/* Settings Dropdown */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 5px;
+    background-color: var(--bg-container);
+    min-width: 200px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    z-index: 200;
+    overflow: hidden;
+}
+
+.dropdown-content.show {
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdown-item {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    padding: 10px 15px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+    font-family: inherit;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: var(--border-color);
+}
+
+.dropdown-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    color: var(--text-main);
+}
+
 
 /* MOBILE RESPONSIVENESS */
 @media (max-width: 600px) {
     .container { width: 100%; height: 100%; border-radius: 0; border: none; }
     .header { 
         padding: 8px 10px; 
-        flex-direction: column; 
-        align-items: stretch;
-        gap: 8px;
+        flex-direction: row; 
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
     }
     .header-center { 
-        order: -1; 
+        flex: 1;
+        order: 2; 
         min-width: auto; 
-        text-align: left; 
-        padding-bottom: 8px; 
-        border-bottom: 1px solid var(--border-color); 
+        text-align: center; 
+        padding-bottom: 0; 
+        border-bottom: none; 
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.9em;
     }
-    .header-left { min-width: auto; justify-content: space-between; gap: 10px; }
-    .header-right { min-width: auto; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
+    .header-left { flex: unset; min-width: auto; order: 1; justify-content: flex-start; gap: 8px; }
+    .header-right { flex: unset; min-width: auto; order: 3; justify-content: flex-end; gap: 5px; margin-top: 0; }
     
     .title-details,
     .status-text,

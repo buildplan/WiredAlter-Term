@@ -956,6 +956,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- Passkey, Download, and Telemetry Logic ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Settings Dropdown Toggle
+    const settingsBtn = document.getElementById('settings-menu-btn');
+    const settingsDropdown = document.getElementById('settings-dropdown');
+    if (settingsBtn && settingsDropdown) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsDropdown.classList.toggle('show');
+        });
+        document.addEventListener('click', (e) => {
+            if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
+                settingsDropdown.classList.remove('show');
+            }
+        });
+    }
+
     // Custom Dialog Helpers
     function showCustomAlert(message, title = "Message") {
         return new Promise(resolve => {
