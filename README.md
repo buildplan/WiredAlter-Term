@@ -22,6 +22,8 @@ It provides a terminal environment in your browser with persistent configuration
 
 Clone the repository and start the container using the included proxy configuration:
 
+**Note on Security:** By default, authentication relies on a PIN. If you register a passkey from the web interface, you can optionally disable PIN authentication completely by setting `DISABLE_PIN=true` in `compose.yml`.
+
 ```bash
 git clone https://github.com/buildplan/WiredAlter-Term.git
 cd WiredAlter-Term

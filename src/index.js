@@ -26,7 +26,8 @@ const io = new Server(httpServer);
 
 const PORT = process.env.PORT || 3939;
 const PIN = process.env.PIN || "123456";
-if (!process.env.PIN) {
+const DISABLE_PIN = process.env.DISABLE_PIN === 'true';
+if (!process.env.PIN && !DISABLE_PIN) {
     console.warn("⚠️  WARNING: Using default PIN '123456'. Please set a secure PIN in your environment variables.");
 }
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -58,6 +59,10 @@ db.exec(`
     id TEXT PRIMARY KEY,
     publicKey TEXT,
     counter INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
   );
 `);
 
@@ -202,6 +207,12 @@ app.get('/login', (req, res) => {
 
 // Use the stricter loginLimiter specifically for verification
 app.post('/verify-pin', loginLimiter, (req, res) => {
+    const dbDisablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
+    const isPinDisabled = DISABLE_PIN || (dbDisablePin ? dbDisablePin.value === 'true' : false);
+
+    if (isPinDisabled) {
+        return res.status(403).json({ error: "PIN LOGIN DISABLED" });
+    }
     const { pin } = req.body;
     if (!pin || typeof pin !== 'string' || pin.length !== PIN.length) {
         return res.status(401).json({ error: "ACCESS DENIED: Invalid Passcode" });
@@ -215,6 +226,12 @@ app.post('/verify-pin', loginLimiter, (req, res) => {
     } else {
         res.status(401).json({ error: "ACCESS DENIED: Invalid Passcode" });
     }
+});
+
+app.get('/auth-methods', (req, res) => {
+    const dbDisablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
+    const isPinDisabled = DISABLE_PIN || (dbDisablePin ? dbDisablePin.value === 'true' : false);
+    res.json({ disablePin: isPinDisabled });
 });
 
 app.get('/logout', (req, res) => {
@@ -328,7 +345,7 @@ app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
 
 // Auth Guard Middleware
 const requireAuth = (req, res, next) => {
-    const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico'];
+    const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico', '/auth-methods'];
     if (publicAllowlist.includes(req.path)) return next();
 
     if (req.session && req.session.authenticated) {
@@ -338,6 +355,20 @@ const requireAuth = (req, res, next) => {
 };
 
 app.use(requireAuth);
+
+// --- SETTINGS ROUTES ---
+app.get('/api/settings', (req, res) => {
+    const disablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
+    res.json({ disablePin: disablePin ? disablePin.value === 'true' : false, envDisablePin: DISABLE_PIN });
+});
+
+app.post('/api/settings', (req, res) => {
+    const { disablePin } = req.body;
+    if (typeof disablePin !== 'undefined') {
+        db.prepare("INSERT INTO settings (key, value) VALUES ('disable_pin', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(disablePin ? 'true' : 'false');
+    }
+    res.json({ success: true });
+});
 
 // --- 4. GENERAL MIDDLEWARE & ROUTES ---
 

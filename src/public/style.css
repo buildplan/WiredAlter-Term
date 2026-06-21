@@ -11,6 +11,7 @@
     --bg-body: #0d1117;
     --bg-container: #161b22;
     --bg-header: #21262d;
+    --bg-header-glass: rgba(33, 38, 45, 0.85);
     --border-color: #30363d;
     --text-main: #c9d1d9;
     --text-title: #58a6ff;
@@ -37,6 +38,7 @@ html.light {
     --bg-body: #ffffff;
     --bg-container: #f6f8fa;
     --bg-header: #ffffff;
+    --bg-header-glass: rgba(255, 255, 255, 0.85);
     --border-color: #d0d7de;
     --text-main: #24292f;
     --text-title: #0969da;
@@ -92,14 +94,49 @@ body {
 
 .header {
     flex-shrink: 0;
-    background: var(--bg-header);
+    background: var(--bg-header-glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 10px 15px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     justify-content: space-between;
     align-items: center;
     user-select: none;
     transition: background-color 0.3s, border-color 0.3s;
+    z-index: 100;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+    min-width: 250px;
+}
+
+.header-center {
+    flex: 1;
+    text-align: center;
+    min-width: 200px;
+    white-space: nowrap;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 250px;
+}
+
+.telemetry-display {
+    font-size: 0.85em;
+    opacity: 0.7;
+    font-family: monospace;
 }
 
 .terminal-workspace {
@@ -580,15 +617,89 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
 html.light .custom-modal::backdrop {
     background: rgba(255, 255, 255, 0.4);
 }
+/* Settings Dropdown */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 5px;
+    background-color: var(--bg-container);
+    min-width: 200px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    z-index: 200;
+    overflow: hidden;
+}
+
+.dropdown-content.show {
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdown-item {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    padding: 10px 15px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+    font-family: inherit;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: var(--border-color);
+}
+
+.dropdown-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    color: var(--text-main);
+}
+
 
 /* MOBILE RESPONSIVENESS */
 @media (max-width: 600px) {
     .container { width: 100%; height: 100%; border-radius: 0; border: none; }
-    .header { padding: 5px 10px; }
+    .header { 
+        padding: 8px 10px; 
+        flex-direction: row; 
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+    }
+    .header-center { 
+        flex: 1;
+        order: 2; 
+        min-width: auto; 
+        text-align: center; 
+        padding-bottom: 0; 
+        border-bottom: none; 
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.9em;
+    }
+    .header-left { flex: unset; min-width: auto; order: 1; justify-content: flex-start; gap: 8px; }
+    .header-right { flex: unset; min-width: auto; order: 3; justify-content: flex-end; gap: 5px; margin-top: 0; }
+    
     .title-details,
     .status-text,
     .btn-text,
-    #telemetry-display { display: none; }
+    .telemetry-display { display: none; }
     .title { font-size: 1rem; }
     .status { font-size: 1.2rem; }
     .logout-btn { padding: 5px 8px; font-size: 1rem; }
