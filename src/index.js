@@ -160,6 +160,9 @@ const loginLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// Healthcheck endpoint
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
 // General Limiter for Assets (DoS Protection)
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -169,7 +172,7 @@ const generalLimiter = rateLimit({
     message: "Too many requests. Please slow down.",
     skip: (req) => {
         const p = req.path;
-        return p.startsWith('/vendor') || p.startsWith('/fonts') || p.endsWith('.css') || p.endsWith('.js') || p === '/favicon.ico';
+        return p === '/health' || p.startsWith('/vendor') || p.startsWith('/fonts') || p.endsWith('.css') || p.endsWith('.js') || p === '/favicon.ico';
     }
 });
 

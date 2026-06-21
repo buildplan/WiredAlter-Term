@@ -251,7 +251,7 @@ class TerminalTab {
         });
 
         this.socket.on('connect', () => {
-            if(this.isActive()) {
+            if (this.isActive()) {
                 this.syncStatus();
                 this.startLatencyCheck();
                 this.resize();
@@ -259,12 +259,12 @@ class TerminalTab {
         });
 
         this.socket.on('disconnect', () => {
-            if(this.isActive()) this.updateStatus('disconnected');
+            if (this.isActive()) this.updateStatus('disconnected');
             clearInterval(this.pingInterval);
         });
 
         this.socket.on('connect_error', () => {
-            if(this.isActive()) this.updateStatus('error');
+            if (this.isActive()) this.updateStatus('error');
         });
 
         this.socket.on('latency:pong', (timestamp) => {
@@ -281,7 +281,7 @@ class TerminalTab {
     startLatencyCheck() {
         clearInterval(this.pingInterval);
         this.pingInterval = setInterval(() => {
-            if(this.socket.connected) {
+            if (this.socket.connected) {
                 this.socket.emit('latency:ping', Date.now());
             }
         }, 2000);
@@ -307,7 +307,7 @@ class TerminalTab {
         this.tabElement.appendChild(closeSpan);
 
         this.tabElement.addEventListener('click', (e) => {
-            if(!e.target.classList.contains('tab-close')) {
+            if (!e.target.classList.contains('tab-close')) {
                 this.manager.setActiveTab(this.id);
             }
         });
@@ -438,21 +438,21 @@ class TerminalTab {
         try {
             if (this.element) this.element.remove();
             if (this.tabElement) this.tabElement.remove();
-        } catch(e) {
+        } catch (e) {
             console.error("DOM Cleanup error", e);
         }
         if (this.pingInterval) clearInterval(this.pingInterval);
         if (this.resizeObserver) { this.resizeObserver.disconnect(); }
         try {
-            if(this.socket) {
+            if (this.socket) {
                 this.socket.disconnect();
             }
-        } catch(e) {
+        } catch (e) {
             console.warn("Socket cleanup error", e);
         }
         try {
-            if(this.webglAddon) this.webglAddon.dispose();
-            if(this.term) this.term.dispose();
+            if (this.webglAddon) this.webglAddon.dispose();
+            if (this.term) this.term.dispose();
         } catch (e) {
             console.warn("Terminal cleanup warning:", e);
         }
@@ -471,7 +471,7 @@ class TabManager {
             this.saveState();
         });
 
-        if(window.Sortable) {
+        if (window.Sortable) {
             new Sortable(document.getElementById('tabs-list'), {
                 animation: 150,
                 ghostClass: 'tab-ghost',
@@ -882,7 +882,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Intercept actual typing to apply the Ctrl/Alt modifiers
     if (window.tabManager) {
         const originalEmit = io.Socket.prototype.emit;
-        io.Socket.prototype.emit = function(eventName, payload) {
+        io.Socket.prototype.emit = function (eventName, payload) {
             if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
                 const charLower = payload.toLowerCase();
 
@@ -979,7 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('custom-modal-text').textContent = message;
             document.getElementById('custom-modal-input-container').style.display = 'none';
             document.getElementById('custom-modal-cancel').style.display = 'none';
-            
+
             const okBtn = document.getElementById('custom-modal-ok');
             const cleanup = () => {
                 okBtn.removeEventListener('click', onOk);
@@ -1001,11 +1001,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputField = document.getElementById('custom-modal-input');
             inputContainer.style.display = 'block';
             inputField.value = '';
-            
+
             const cancelBtn = document.getElementById('custom-modal-cancel');
             cancelBtn.style.display = 'inline-flex';
             const okBtn = document.getElementById('custom-modal-ok');
-            
+
             const cleanup = (val) => {
                 okBtn.removeEventListener('click', onOk);
                 cancelBtn.removeEventListener('click', onCancel);
@@ -1019,11 +1019,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (e.key === 'Enter') onOk();
                 if (e.key === 'Escape') onCancel();
             };
-            
+
             okBtn.addEventListener('click', onOk);
             cancelBtn.addEventListener('click', onCancel);
             inputField.addEventListener('keydown', onKey);
-            
+
             modal.showModal();
             inputField.focus();
         });
@@ -1035,13 +1035,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('custom-modal-title').textContent = title;
             document.getElementById('custom-modal-text').textContent = message;
             document.getElementById('custom-modal-input-container').style.display = 'none';
-            
+
             const cancelBtn = document.getElementById('custom-modal-cancel');
             cancelBtn.style.display = 'inline-flex';
             const okBtn = document.getElementById('custom-modal-ok');
             okBtn.textContent = 'Yes';
             cancelBtn.textContent = 'No';
-            
+
             const cleanup = (val) => {
                 okBtn.removeEventListener('click', onOk);
                 cancelBtn.removeEventListener('click', onCancel);
@@ -1052,10 +1052,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             const onOk = () => cleanup(true);
             const onCancel = () => cleanup(false);
-            
+
             okBtn.addEventListener('click', onOk);
             cancelBtn.addEventListener('click', onCancel);
-            
+
             modal.showModal();
         });
     }
@@ -1122,15 +1122,15 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const resp = await fetch('/api/settings');
                 const settings = await resp.json();
-                
+
                 if (settings.envDisablePin) {
                     await showCustomAlert('PIN login is completely disabled via environment variable (DISABLE_PIN=true).', 'Security Settings');
                     return;
                 }
-                
+
                 const currentStatus = settings.disablePin ? 'DISABLED' : 'ENABLED';
                 const actionText = settings.disablePin ? 'Enable' : 'Disable';
-                
+
                 const confirmChange = await showCustomConfirm(`PIN login is currently ${currentStatus}.\n\nDo you want to ${actionText} PIN login?`, 'Security Settings');
                 if (confirmChange) {
                     const newStatus = !settings.disablePin;

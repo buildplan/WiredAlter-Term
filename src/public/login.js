@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     themeBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); 
+        e.stopPropagation();
         const html = document.documentElement;
         const isLight = html.classList.toggle('light');
         localStorage.setItem('wired-term-theme', isLight ? 'light' : 'dark');

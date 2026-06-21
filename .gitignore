@@ -5,6 +5,7 @@ src/public/vendor/
 
 # Persistent Data
 data/
+test_data/
 
 # Environment variables
 compose-prod*
