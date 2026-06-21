@@ -113,8 +113,7 @@ EXPOSE 3939
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3939/ || exit 1
+  CMD curl -f http://localhost:3939/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "src/index.js"]
-
