@@ -1071,6 +1071,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 1.5 Upload
+    const uploadMenuBtn = document.getElementById('upload-menu-btn');
+    const hiddenFileInput = document.getElementById('hidden-file-input');
+    
+    if (uploadMenuBtn && hiddenFileInput) {
+        uploadMenuBtn.addEventListener('click', () => {
+            hiddenFileInput.click();
+            const settingsDropdown = document.getElementById('settings-dropdown');
+            if (settingsDropdown) settingsDropdown.classList.remove('show');
+        });
+
+        hiddenFileInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            const activeTab = window.tabManager ? window.tabManager.getActiveTab() : null;
+            if (!activeTab) return;
+
+            const formData = new FormData();
+            for (const file of files) formData.append('files', file);
+
+            activeTab.term.write('\r\n\x1b[36m📤 Uploading ' + files.length + ' file(s)...\x1b[0m\r\n');
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                if (!res.ok) throw new Error('Upload failed');
+                activeTab.socket.emit('terminal:input', '\r');
+            } catch (err) {
+                activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
+                activeTab.socket.emit('terminal:input', '\r');
+            }
+            
+            // Clear the input so the same file can be uploaded again if needed
+            hiddenFileInput.value = '';
+        });
+    }
+
     // 2. Passkey Registration
     const passkeyBtn = document.getElementById('passkey-register-btn');
     if (passkeyBtn) {
