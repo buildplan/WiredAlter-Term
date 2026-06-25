@@ -19,7 +19,7 @@
     "url": "https://github.com/buildplan/WiredAlter-Term/issues"
   },
   "engines": {
-    "node": ">=26.3.1"
+    "node": ">=26.4.0"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
-    "@simplewebauthn/server": "^13.3.1",
+    "@simplewebauthn/server": "^13.3.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-serialize": "^0.14.0",
