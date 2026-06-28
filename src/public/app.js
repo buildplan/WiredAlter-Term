@@ -1075,7 +1075,17 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtn.addEventListener('click', async () => {
             const fileName = await showCustomPrompt('Enter the name of the file to download from /data:', 'Download File');
             if (fileName) {
-                window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
+                try {
+                    const res = await fetch(`/download?file=${encodeURIComponent(fileName)}`, { method: 'HEAD' });
+                    if (res.ok) {
+                        window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
+                    } else {
+                        const statusMsg = res.status === 404 ? 'File not found' : (res.status === 403 ? 'Access forbidden' : 'Download failed');
+                        await showCustomAlert(statusMsg, 'Download Error');
+                    }
+                } catch (e) {
+                    await showCustomAlert('Network error checking file', 'Download Error');
+                }
             }
         });
     }
@@ -1106,11 +1116,11 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const csrfRes = await fetch('/api/csrf-token');
                 const { token } = await csrfRes.json();
-                
-                const res = await fetch('/upload', { 
-                    method: 'POST', 
+
+                const res = await fetch('/upload', {
+                    method: 'POST',
                     headers: { 'x-csrf-token': token },
-                    body: formData 
+                    body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
                 activeTab.socket.emit('terminal:input', '\r');
