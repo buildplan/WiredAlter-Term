@@ -79,6 +79,27 @@ ts() {
         fi
     fi
 }
+
+alias tr='tmux rename-session'
+alias tk='tmux kill-session'
+alias tka='tmux kill-server'
+
+# Tmux Cheat Sheet
+thelp() {
+    echo -e "\e[1;36m=== Tmux Shortcuts ===\e[0m"
+    echo -e "  \e[1;32mts\e[0m      Interactive session switcher (fzf)"
+    echo -e "  \e[1;32mtl\e[0m      List active sessions (tmux ls)"
+    echo -e "  \e[1;32mta\e[0m      Attach to session (e.g. ta tab-1)"
+    echo -e "  \e[1;32mtd\e[0m      Detach from current session"
+    echo -e "  \e[1;32mtr\e[0m      Rename current session (e.g. tr new-name)"
+    echo -e "  \e[1;32mtk\e[0m      Kill/Close current session"
+    echo -e "  \e[1;32mtka\e[0m     Kill/Close ALL sessions"
+    echo -e ""
+    echo -e "  \e[1;33mCtrl+b s\e[0m  Built-in visual session switcher"
+    echo -e "  \e[1;33mCtrl+b d\e[0m  Built-in detach shortcut"
+    echo -e "  \e[1;33mCtrl+b $\e[0m  Built-in rename session"
+    echo -e "\e[1;36m======================\e[0m"
+}
 alias rec='asciinema rec'
 alias play='asciinema play'
 alias ports='nc -vz'
