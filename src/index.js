@@ -5,7 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import pty from 'node-pty';
 import { fileURLToPath } from 'url';
-import { dirname, join, relative, isAbsolute } from 'path';
+import { dirname, join, relative, isAbsolute, basename } from 'path';
 import fs from 'fs';
 import session from 'express-session';
 import BetterSqlite3 from 'better-sqlite3';
@@ -419,13 +419,19 @@ app.post('/upload', csrfCheck, upload.array('files'), (req, res) => {
 app.get('/download', (req, res) => {
     const fileName = req.query.file;
     if (!fileName || typeof fileName !== 'string') return res.status(400).send('File required');
-    const safePath = join(DATA_DIR, fileName);
-    const relPath = relative(DATA_DIR, safePath);
-    if (relPath && (relPath.startsWith('..') || isAbsolute(relPath))) {
+
+    if (fileName.includes('\0') || fileName.includes('../') || fileName.includes('..\\')) {
         return res.status(403).send('Forbidden');
     }
-    if (!fs.existsSync(safePath)) return res.status(404).send('File not found');
-    res.download(safePath);
+
+    const baseName = basename(fileName);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(baseName)}"`);
+
+    res.sendFile(fileName, { root: DATA_DIR, dotfiles: 'allow' }, (err) => {
+        if (err && !res.headersSent) {
+            res.status(err.status || 404).send('File not found');
+        }
+    });
 });
 
 // Logging & Favicon
