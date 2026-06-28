@@ -11,8 +11,8 @@ on:
       - 'renovate.json'
       - 'LICENSE'
       - 'docs/**'
-      - '.workflow/dependabot.yml'
-      - '.github/workflow/auto-tag.yml'
+      - '.github/dependabot.yml'
+      - '.github/workflows/auto-tag.yml'
   workflow_dispatch:
 
 env:

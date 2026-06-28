@@ -5,7 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import pty from 'node-pty';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, relative, isAbsolute } from 'path';
 import fs from 'fs';
 import session from 'express-session';
 import BetterSqlite3 from 'better-sqlite3';
@@ -138,11 +138,12 @@ const sessionMiddleware = session({
         secure: IS_PRODUCTION,
         httpOnly: true,
         sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 4 * 60 * 60 * 1000 // 4 hours
     },
     secret: sessionSecret,
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    rolling: true
 });
 
 app.use(sessionMiddleware);
@@ -237,11 +238,11 @@ app.get('/auth-methods', (req, res) => {
     res.json({ disablePin: isPinDisabled });
 });
 
-app.get('/logout', (req, res) => {
+app.post('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) { console.error("⚠️ Logout Session Error:", err); }
         res.clearCookie('connect.sid');
-        res.redirect('/login');
+        res.json({ success: true });
     });
 });
 
@@ -359,13 +360,33 @@ const requireAuth = (req, res, next) => {
 
 app.use(requireAuth);
 
+// --- CSRF PROTECTION ---
+app.get('/api/csrf-token', (req, res) => {
+    if (!req.session.csrfToken) {
+        req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+        req.session.save(() => {
+            res.json({ token: req.session.csrfToken });
+        });
+    } else {
+        res.json({ token: req.session.csrfToken });
+    }
+});
+
+const csrfCheck = (req, res, next) => {
+    const token = req.headers['x-csrf-token'];
+    if (!token || token !== req.session.csrfToken) {
+        return res.status(403).json({ error: 'CSRF token missing or invalid' });
+    }
+    next();
+};
+
 // --- SETTINGS ROUTES ---
 app.get('/api/settings', (req, res) => {
     const disablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
     res.json({ disablePin: disablePin ? disablePin.value === 'true' : false, envDisablePin: DISABLE_PIN });
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', csrfCheck, (req, res) => {
     const { disablePin } = req.body;
     if (typeof disablePin !== 'undefined') {
         db.prepare("INSERT INTO settings (key, value) VALUES ('disable_pin', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(disablePin ? 'true' : 'false');
@@ -376,7 +397,7 @@ app.post('/api/settings', (req, res) => {
 // --- 4. GENERAL MIDDLEWARE & ROUTES ---
 
 // Upload Handler
-app.post('/upload', upload.array('files'), (req, res) => {
+app.post('/upload', csrfCheck, upload.array('files'), (req, res) => {
     if (!req.files || !Array.isArray(req.files)) {
         return res.status(400).json({ error: 'Invalid upload data received.' });
     }
@@ -399,7 +420,10 @@ app.get('/download', (req, res) => {
     const fileName = req.query.file;
     if (!fileName || typeof fileName !== 'string') return res.status(400).send('File required');
     const safePath = join(DATA_DIR, fileName);
-    if (!safePath.startsWith(DATA_DIR)) return res.status(403).send('Forbidden');
+    const relPath = relative(DATA_DIR, safePath);
+    if (relPath && (relPath.startsWith('..') || isAbsolute(relPath))) {
+        return res.status(403).send('Forbidden');
+    }
     if (!fs.existsSync(safePath)) return res.status(404).send('File not found');
     res.download(safePath);
 });
@@ -527,7 +551,17 @@ io.on('connection', (socket) => {
         catch (err) { console.warn('Resize failed:', err.message); }
     });
     socket.on('disconnect', () => ptyProcess.kill());
-    socket.on('latency:ping', (timestamp) => { socket.emit('latency:pong', timestamp); });
+    socket.on('latency:ping', (timestamp) => {
+        socket.emit('latency:pong', timestamp);
+        if (req.session) {
+            const now = Date.now();
+            if (!socket.lastSessionSave || now - socket.lastSessionSave > 5 * 60 * 1000) {
+                req.session.touch();
+                req.session.save();
+                socket.lastSessionSave = now;
+            }
+        }
+    });
 
     // Telemetry handler
     socket.on('telemetry:request', () => {

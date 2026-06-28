@@ -68,8 +68,12 @@ describe('WiredAlter-Term Full Suite', () => {
     });
 
     it('POST /upload should succeed now (Authenticated)', async () => {
+        const csrfRes = await agent.get('/api/csrf-token');
+        const token = csrfRes.body.token;
+
         const response = await agent
             .post('/upload')
+            .set('x-csrf-token', token)
             .attach('files', Buffer.from('test content'), 'ci-test.txt');
 
         assert.strictEqual(response.status, 200);
