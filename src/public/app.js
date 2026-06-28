@@ -624,7 +624,14 @@ class TabManager {
             activeTab.term.write('\r\n\x1b[36m📤 Uploading ' + files.length + ' file(s)...\x1b[0m\r\n');
 
             try {
-                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const csrfRes = await fetch('/api/csrf-token');
+                const { token } = await csrfRes.json();
+
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'x-csrf-token': token },
+                    body: formData
+                });
                 if (!res.ok) throw new Error('Upload failed');
                 activeTab.socket.emit('terminal:input', '\r');
             } catch (err) {
@@ -671,7 +678,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
-            window.location.href = '/logout';
+            fetch('/logout', { method: 'POST' }).then(() => {
+                window.location.href = '/login';
+            });
         });
     }
 
@@ -1066,7 +1075,17 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtn.addEventListener('click', async () => {
             const fileName = await showCustomPrompt('Enter the name of the file to download from /data:', 'Download File');
             if (fileName) {
-                window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
+                try {
+                    const res = await fetch(`/download?file=${encodeURIComponent(fileName)}`, { method: 'HEAD' });
+                    if (res.ok) {
+                        window.location.href = `/download?file=${encodeURIComponent(fileName)}`;
+                    } else {
+                        const statusMsg = res.status === 404 ? 'File not found' : (res.status === 403 ? 'Access forbidden' : 'Download failed');
+                        await showCustomAlert(statusMsg, 'Download Error');
+                    }
+                } catch (e) {
+                    await showCustomAlert('Network error checking file', 'Download Error');
+                }
             }
         });
     }
@@ -1074,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1.5 Upload
     const uploadMenuBtn = document.getElementById('upload-menu-btn');
     const hiddenFileInput = document.getElementById('hidden-file-input');
-    
+
     if (uploadMenuBtn && hiddenFileInput) {
         uploadMenuBtn.addEventListener('click', () => {
             hiddenFileInput.click();
@@ -1095,14 +1114,21 @@ document.addEventListener('DOMContentLoaded', () => {
             activeTab.term.write('\r\n\x1b[36m📤 Uploading ' + files.length + ' file(s)...\x1b[0m\r\n');
 
             try {
-                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const csrfRes = await fetch('/api/csrf-token');
+                const { token } = await csrfRes.json();
+
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'x-csrf-token': token },
+                    body: formData
+                });
                 if (!res.ok) throw new Error('Upload failed');
                 activeTab.socket.emit('terminal:input', '\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
                 activeTab.socket.emit('terminal:input', '\r');
             }
-            
+
             // Clear the input so the same file can be uploaded again if needed
             hiddenFileInput.value = '';
         });
@@ -1134,9 +1160,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (verification.success) {
                     const wantsToDisable = await showCustomConfirm('Passkey registered! Do you want to disable PIN login and use passkeys only?', 'Success');
                     if (wantsToDisable) {
+                        const csrfRes = await fetch('/api/csrf-token');
+                        const { token } = await csrfRes.json();
                         await fetch('/api/settings', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-csrf-token': token
+                            },
                             body: JSON.stringify({ disablePin: true })
                         });
                         await showCustomAlert('PIN login is now disabled.', 'Settings Updated');
@@ -1171,9 +1202,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const confirmChange = await showCustomConfirm(`PIN login is currently ${currentStatus}.\n\nDo you want to ${actionText} PIN login?`, 'Security Settings');
                 if (confirmChange) {
                     const newStatus = !settings.disablePin;
+                    const csrfRes = await fetch('/api/csrf-token');
+                    const { token } = await csrfRes.json();
                     await fetch('/api/settings', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-csrf-token': token
+                        },
                         body: JSON.stringify({ disablePin: newStatus })
                     });
                     await showCustomAlert(`PIN login is now ${newStatus ? 'DISABLED' : 'ENABLED'}.`, 'Settings Updated');
