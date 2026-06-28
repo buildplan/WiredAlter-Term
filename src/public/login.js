@@ -84,10 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const passkeyBtn = document.getElementById('passkeyBtn');
     if (passkeyBtn) {
         passkeyBtn.addEventListener('click', async () => {
-            const { startAuthentication } = window.SimpleWebAuthnBrowser;
             feedback.textContent = "WAITING FOR PASSKEY...";
             feedback.style.color = "#e0af68";
             try {
+                if (!window.SimpleWebAuthnBrowser) {
+                    throw new Error('WebAuthn library not loaded. Try refreshing.');
+                }
+                const { startAuthentication } = window.SimpleWebAuthnBrowser;
                 const resp = await fetch('/webauthn/auth-options');
                 if (!resp.ok) {
                     const data = await resp.json();
@@ -110,8 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     feedback.style.color = "#ff5555";
                 }
             } catch (e) {
-                feedback.textContent = e.message || "SYSTEM ERROR";
-                feedback.style.color = "#ff5555";
+                const msg = e.name === 'NotAllowedError'
+                    ? 'Passkey cancelled. Try again when ready.'
+                    : (e.message || 'SYSTEM ERROR');
+                feedback.textContent = msg;
+                feedback.style.color = e.name === 'NotAllowedError' ? '#e0af68' : '#ff5555';
             }
         });
     }

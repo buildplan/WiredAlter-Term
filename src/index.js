@@ -350,7 +350,7 @@ app.post('/webauthn/auth-verify', loginLimiter, async (req, res) => {
 // Auth Guard Middleware
 const requireAuth = (req, res, next) => {
     const publicAllowlist = ['/login', '/style.css', '/login.js', '/fonts/font.ttf', '/favicon.ico', '/auth-methods'];
-    if (publicAllowlist.includes(req.path)) return next();
+    if (publicAllowlist.includes(req.path) || req.path.startsWith('/vendor/')) return next();
 
     if (req.session && req.session.authenticated) {
         return next();
