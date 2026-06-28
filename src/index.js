@@ -534,13 +534,18 @@ io.on('connection', (socket) => {
         return;
     }
 
-    const cleanEnv = { ...process.env, TERM: 'xterm-256color' };
+    const tabId = socket.handshake.query.tabId || 'main';
+    const cleanEnv = { ...process.env, TERM: 'xterm-256color', WIRED_TAB_ID: tabId };
     delete cleanEnv.TMUX;
     delete cleanEnv.TMUX_PANE;
+    
+    const initCols = parseInt(socket.handshake.query.cols, 10) || 80;
+    const initRows = parseInt(socket.handshake.query.rows, 10) || 30;
+
     const ptyProcess = pty.spawn('bash', [], {
         name: 'xterm-256color',
-        cols: 80,
-        rows: 30,
+        cols: initCols,
+        rows: initRows,
         cwd: process.env.HOME,
         env: cleanEnv
     });

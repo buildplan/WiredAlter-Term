@@ -50,16 +50,34 @@ alias egrep='egrep --color=auto'
 # Tool Shortcuts
 alias t='tmux'
 alias ta='tmux attach'
+
+# Interactive Tmux Session Switcher (uses fzf)
+ts() {
+    local session
+    session=$(tmux ls 2>/dev/null | fzf --prompt="Select Tmux Session: " --height=15 --reverse | cut -d: -f1)
+    if [ -n "$session" ]; then
+        if [ -n "$TMUX" ]; then
+            # We are already inside tmux, so we switch the client
+            tmux switch-client -t "$session"
+        else
+            # We are outside tmux, so we attach
+            tmux attach -t "$session"
+        fi
+    fi
+}
 alias rec='asciinema rec'
 alias play='asciinema play'
 alias ports='nc -vz'
 
-# Auto-start or Auto-attach to a Tmux session named "main"
+# Auto-start or Auto-attach to a Tmux session named by WIRED_TAB_ID (or "main" fallback)
 # --- TMUX AUTO-START WITH ESCAPE HATCH ---
 if command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
-    if [ ! -f "$HOME/.notmux" ]; then exec tmux new-session -A -s main; fi
+    if [ ! -f "$HOME/.notmux" ]; then 
+        SESSION_NAME="tab-${WIRED_TAB_ID:-main}"
+        exec tmux new-session -A -s "$SESSION_NAME"
+    fi
 fi
 
 # --- TMUX TOGGLE ALIASES ---
 alias tmux-off="touch ~/.notmux && clear && echo '❌ Tmux auto-start disabled. Type \"exit\" to close this session, then click New Tab (+).'"
-alias tmux-on="rm -f ~/.notmux && clear && if [ -z \"\$TMUX\" ]; then exec tmux new-session -A -s main; else echo '✅ Tmux auto-start enabled.'; fi"
+alias tmux-on="rm -f ~/.notmux && clear && if [ -z \"\$TMUX\" ]; then SESSION_NAME=\"tab-\${WIRED_TAB_ID:-main}\"; exec tmux new-session -A -s \"\$SESSION_NAME\"; else echo '✅ Tmux auto-start enabled.'; fi"

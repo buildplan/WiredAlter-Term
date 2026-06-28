@@ -180,16 +180,6 @@ class TerminalTab {
             if (this.webglAddon) this.webglAddon.dispose();
         }
 
-        this.socket = io({
-            forceNew: true,
-            multiplex: false,
-            reconnection: true,
-            reconnectionAttempts: 10,
-            reconnectionDelay: 1000
-        });
-
-        this.setupSocketEvents();
-
         this.term.open(this.element);
         if (this.term.textarea) {
             this.term.textarea.name = `xterm-input-${this.id}`;
@@ -203,8 +193,27 @@ class TerminalTab {
         this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.fitAddon.fit();
+        
+        try {
+            this.fitAddon.fit();
+        } catch (e) {
+            console.warn("Initial fit failed", e);
+        }
 
+        this.socket = io({
+            forceNew: true,
+            multiplex: false,
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            query: {
+                cols: this.term.cols || 80,
+                rows: this.term.rows || 30,
+                tabId: this.id
+            }
+        });
+
+        this.setupSocketEvents();
         if (this.savedContent) {
             this.term.write(this.savedContent);
             this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
