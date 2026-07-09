@@ -14,7 +14,7 @@
     { "matchUpdateTypes": ["minor","patch"], "automerge": true },
     { "description": "Group all xterm related packages together", "groupName": "xterm packages", "matchPackageNames": ["/^xterm/"] }
   ],
-  "constraints": { "node": "26.4.0" },
+  "constraints": { "node": "26.5.0" },
   "customManagers": [
     {
       "customType": "regex",
