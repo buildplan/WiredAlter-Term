@@ -58,8 +58,8 @@ ARG STARSHIP_VERSION=v1.26.0
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
 
 # Install Tailscale
-COPY --from=docker.io/tailscale/tailscale:v1.98.8@sha256:d54b2e6a9c09f0e5ec52e82b9ad4af3d446b54a7c08075e92f11c39dd410105f /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=docker.io/tailscale/tailscale:v1.98.8@sha256:d54b2e6a9c09f0e5ec52e82b9ad4af3d446b54a7c08075e92f11c39dd410105f /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
 
 # Install asciinema
