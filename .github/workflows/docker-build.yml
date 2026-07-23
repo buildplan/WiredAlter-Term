@@ -111,6 +111,7 @@ jobs:
           delete-untagged: true
           keep-at-most: 5
           skip-tags: "latest, main, dev"
+
       # Print the output                                                          
-      - name: Show number of deleted images                                                                                                              
-        run: echo "Number of deleted images in this run: ${{ steps.cleaner.outputs.num_deleted }}" 
+      - name: Show number of deleted images
+        run: echo "Number of deleted images in this run: ${{ steps.cleaner.outputs.num_deleted }}"
