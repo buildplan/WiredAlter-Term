@@ -101,11 +101,18 @@ jobs:
 
       # Cleanup
       - name: Clean up old GHCR images
-        uses: freke/github_docker_package_cleanup@v1.0.0
+        id: cleaner 
+        uses: buildplan/ghcr-cleaner@v1
         with:
+          owner-type: user
           token: ${{ secrets.PAT_TOKEN }}
-          package: "wiredalter-term"
-          keep: "^main$, ^dev$"
-          days: 7
-          dry_run: false
-        continue-on-error: true
+          repository-owner: ${{ github.repository_owner }}
+          repository-name: "wiredalter-term"
+          delete-untagged: true
+          keep-at-most: 5
+          skip-tags: "latest, main, dev"
+
+      # Print the output                                                          
+      - name: Show number of deleted images
+        run: |
+          echo "Number of deleted images in this run: ${{ steps.cleaner.outputs.num_deleted }}"
