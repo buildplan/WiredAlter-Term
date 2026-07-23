@@ -114,4 +114,5 @@ jobs:
 
       # Print the output                                                          
       - name: Show number of deleted images
-        run: echo "Number of deleted images in this run: ${{ steps.cleaner.outputs.num_deleted }}"
+        run: |
+          echo "Number of deleted images in this run: ${{ steps.cleaner.outputs.num_deleted }}"
