@@ -110,7 +110,7 @@ jobs:
           repository-name: "wiredalter-term"
           delete-untagged: true
           keep-at-most: 5
-          skip-tags: "latest, main, dev"
+          skip-tags: "latest, main, dev, [0-9]*.[0-9]*.[0-9]*"
 
       # Print the output                                                          
       - name: Show number of deleted images
