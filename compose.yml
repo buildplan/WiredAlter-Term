@@ -83,6 +83,11 @@ services:
       # [Optional] Override NetBird Config Path
       # Defaults to /var/lib/netbird/config.json
       # - NB_CONFIG=/var/lib/netbird/config.json
+
+      # [Optional] Override NetBird Hostname
+      # Defaults to the container hostname
+      # - NB_HOSTNAME=my-custom-terminal
+
     restart: unless-stopped
     depends_on:
       - docker-proxy
