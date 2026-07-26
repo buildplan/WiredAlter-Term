@@ -1,5 +1,5 @@
 # Use Node.js 26 on Debian 13
-FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS builder
+FROM node:26.5.0-trixie-slim@sha256:95129fe9193fa3354b68607bc3edcbd912eb4ee27536e1a2d8b496da2c70569f AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm prune --omit=dev && \
     rm -rf node_modules/node-pty/prebuilds/darwin-* && \
     rm -rf node_modules/node-pty/prebuilds/win32-*
 
-FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583
+FROM node:26.5.0-trixie-slim@sha256:95129fe9193fa3354b68607bc3edcbd912eb4ee27536e1a2d8b496da2c70569f
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
@@ -61,6 +61,10 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_V
 COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
+
+# Install NetBird
+COPY --from=docker.io/netbirdio/netbird:0.75.0@sha256:f186c12860d0d0a695a9db29bb32dfe81d8e6fb9d219364020f72c606972acc4 /usr/local/bin/netbird /usr/local/bin/netbird
+RUN mkdir -p /var/lib/netbird /var/run/netbird /etc/netbird && chown node:node /var/run/netbird /var/lib/netbird /etc/netbird
 
 # Install asciinema
 # renovate: datasource=github-releases depName=asciinema/asciinema

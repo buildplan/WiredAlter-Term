@@ -9,7 +9,7 @@ It provides a terminal environment in your browser with persistent configuration
 * **Grid View & Tabs:** Manage multiple terminal instances simultaneously with an auto-resizing CSS grid and a tabbed interface.
 * **Persistent Sessions (tmux):** Terminal sessions automatically run inside `tmux`. If your browser disconnects, your background processes keep running.
 * **Secure Docker Control:** Maps the host's Docker socket through an isolated `socket-proxy` container. Read-only access is enforced by default, preventing unauthorised container creation or deletion while allowing `docker ps` and `docker exec`.
-* **Tailscale Integration:** Built-in Tailscale/Headscale support to expose the terminal exclusively to your private VPN network without opening public ports.
+* **Tailscale & NetBird Integration:** Built-in Tailscale/Headscale and NetBird support to expose the terminal exclusively to your private VPN network without opening public ports.
 * **Persistent Identity:** SSH keys (`~/.ssh`), Bash history, and shell configuration (`~/.bashrc`) persist across container restarts.
 * **General Storage:** A dedicated `~/storage` directory for saving downloads, scripts, or project files.
 * **Drag & Drop Uploads:** Drop files directly into the terminal window to upload them to the `/data/` directory.
@@ -27,6 +27,13 @@ Clone the repository and start the container using the included proxy configurat
 ```bash
 git clone https://github.com/buildplan/WiredAlter-Term.git
 cd WiredAlter-Term
+```
+
+**Check compose.yml** Change the defaults in compose.yml `nano compose.yml` - for example change the defult PIN and TAILSCALE_AUTH_KEY.
+
+Then build and start:
+
+```bash
 docker compose up -d --build
 ```
 
@@ -36,7 +43,7 @@ Open your browser and navigate to:
 
 * **Local:** `http://localhost:3939`
 * **Remote:** `http://YOUR_VPS_IP:3939`
-* **Tailscale:** `http://wiredterm:3939` (If configured)
+* **Tailscale/NetBird:** `http://wiredterm:3939` (If configured)
 
 ---
 
@@ -96,6 +103,29 @@ To expose the terminal over Tailscale instead of the public internet:
     ```
 
 3. Restart the container. The terminal will join your Tailnet as `wiredterm`.
+
+---
+
+## NetBird VPN Setup
+
+To expose the terminal over NetBird instead of the public internet:
+
+1. Generate a setup key from your NetBird admin panel.
+2. Edit `compose.yml` to uncomment the required capabilities and environment variables:
+
+    ```yaml
+    # [Required for NetBird] Uncomment the following lines if using NetBird
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+      
+    environment:
+      - NB_SETUP_KEY=xxxxxx-xxxx-xxxx-xxxx-xxxxxx
+      # - NB_MANAGEMENT_URL=https://api.your-netbird-domain.com:443 # Optional
+    ```
+
+3. Restart the container. The terminal will join your NetBird network as `wiredterm`.
 
 ---
 

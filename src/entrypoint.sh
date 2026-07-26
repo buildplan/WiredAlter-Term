@@ -81,7 +81,40 @@ else
     echo "⚠️  TAILSCALE_AUTH_KEY not found. Skipping Tailscale start."
 fi
 
+# --- netbird setup ---
+if [ -n "$NB_SETUP_KEY" ]; then
+    echo "🔗 Starting NetBird..."
+
+    # Allow overriding the config path, defaulting to official Docker expectation
+    export NB_CONFIG="${NB_CONFIG:-/var/lib/netbird/config.json}"
+
+    netbird service run &
+    sleep 3
+    NB_HOSTNAME="$(hostname)"
+
+    MANAGEMENT_ARG=""
+    if [ -n "$NB_MANAGEMENT_URL" ]; then
+        echo "   🎯 Custom Management URL: $NB_MANAGEMENT_URL"
+        MANAGEMENT_ARG="--management-url=${NB_MANAGEMENT_URL}"
+    fi
+
+    EXTRA_FLAGS=${NB_FLAGS:-"--disable-dns"}
+    echo "   Using Flags: $EXTRA_FLAGS"
+
+    netbird up --hostname="${NB_HOSTNAME}" \
+               $MANAGEMENT_ARG \
+               $EXTRA_FLAGS
+
+    echo "✅ NetBird started. Hostname: $NB_HOSTNAME"
+else
+    echo "⚠️  NB_SETUP_KEY not found. Skipping NetBird start."
+fi
+
 # Handover to application
 echo "🚀 Starting application..."
 export TS_SOCKET=/var/run/tailscale/tailscaled.sock
+
+# Fix permissions for /home/node in case background services (running as root) created files
+chown -R node:node /home/node
+
 exec dumb-init -- gosu node "$@"
