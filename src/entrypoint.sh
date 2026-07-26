@@ -86,11 +86,12 @@ if [ -n "$NB_SETUP_KEY" ]; then
     echo "🔗 Starting NetBird..."
 
     # Allow overriding the config path, defaulting to official Docker expectation
-    export NB_CONFIG="${NB_CONFIG:-/var/lib/netbird/config.json}"
+    NETBIRD_CONFIG_PATH="${NB_CONFIG:-/var/lib/netbird/config.json}"
 
-    netbird service run &
+    unset NB_CONFIG
+    netbird service run --config "$NETBIRD_CONFIG_PATH" &
     sleep 3
-    NB_HOSTNAME="$(hostname)"
+    NB_HOSTNAME="${NB_HOSTNAME:-$(hostname)}"
 
     MANAGEMENT_ARG=""
     if [ -n "$NB_MANAGEMENT_URL" ]; then
