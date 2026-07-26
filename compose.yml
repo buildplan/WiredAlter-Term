@@ -43,6 +43,12 @@ services:
       - ./data:/data
       # - /var/run/docker.sock:/var/run/docker.sock # mount Docker sock for host docker management in the terminal (riskly use proxy above)
       - tailscale-data:/var/lib/tailscale # Persist Tailscale state (keys/identity)
+      - netbird-data:/var/lib/netbird # Persist NetBird state (keys/identity)
+    # [Required for NetBird] Uncomment the following lines if using NetBird
+    # cap_add:
+    #   - NET_ADMIN
+    # devices:
+    #   - /dev/net/tun
     environment:
       - NODE_ENV=production
       - PIN=324252             # <--- Change this
@@ -63,6 +69,20 @@ services:
       # Defaults to "--ssh" if not set. 
       - TAILSCALE_FLAGS=--ssh --accept-routes
 
+      # [Required if you want to enable NetBird] Your Setup Key
+      # Generate this at: https://app.netbird.io/setup-keys
+      # - NB_SETUP_KEY=xxxxxx-xxxx-xxxx-xxxx-xxxxxx
+
+      # [Optional] Self-Hosted NetBird Management URL
+      # - NB_MANAGEMENT_URL=https://api.your-netbird-domain.com:443
+
+      # [Optional] Custom NetBird Flags
+      # Defaults to "--disable-dns" to prevent conflicts (e.g. with Tailscale).
+      # - NB_FLAGS=--disable-dns --allow-server-ssh --enable-ssh-root
+
+      # [Optional] Override NetBird Config Path
+      # Defaults to /var/lib/netbird/config.json
+      # - NB_CONFIG=/var/lib/netbird/config.json
     restart: unless-stopped
     depends_on:
       - docker-proxy
@@ -73,3 +93,4 @@ networks:
 
 volumes:
   tailscale-data:
+  netbird-data:

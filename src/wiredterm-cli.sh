@@ -62,6 +62,7 @@ check_tool() {
         case "$tool" in
             tmux) VER=$(tmux -V) ;;
             tailscale) VER=$(tailscale version 2>/dev/null | head -n 1) ;;
+            netbird) VER=$(netbird version 2>/dev/null) ;;
             node) VER=$(node -v) ;;
             starship) VER=$(starship --version | head -n 1 | awk '{print $2}') ;;
             bash) VER=$(bash --version | head -n 1) ;;
@@ -83,6 +84,7 @@ show_tools() {
     check_tool "node"
     check_tool "tmux"
     check_tool "tailscale"
+    check_tool "netbird"
     check_tool "starship"
     check_tool "bash"
     check_tool "docker"
