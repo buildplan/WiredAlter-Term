@@ -58,8 +58,8 @@ ARG STARSHIP_VERSION=v1.26.0
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
 
 # Install Tailscale
-COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
-COPY --from=docker.io/tailscale/tailscale:v1.98.9@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47 /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=docker.io/tailscale/tailscale:v1.98.10@sha256:cdf5612ded5be1344f1a704b8c5e53496db97376bb533e5e15f141e48bf60cc0 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=docker.io/tailscale/tailscale:v1.98.10@sha256:cdf5612ded5be1344f1a704b8c5e53496db97376bb533e5e15f141e48bf60cc0 /usr/local/bin/tailscale /usr/local/bin/tailscale
 RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
 
 # Install NetBird
