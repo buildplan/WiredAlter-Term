@@ -1,5 +1,5 @@
 # Use Node.js 26 on Debian 13
-FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS builder
+FROM node:26.5.1-trixie-slim@sha256:deae974a69e140f44f434ab29cb519fb5f8fe250fd364b8ca446bd0761acdc6a AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm prune --omit=dev && \
     rm -rf node_modules/node-pty/prebuilds/darwin-* && \
     rm -rf node_modules/node-pty/prebuilds/win32-*
 
-FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583
+FROM node:26.5.1-trixie-slim@sha256:deae974a69e140f44f434ab29cb519fb5f8fe250fd364b8ca446bd0761acdc6a
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
@@ -50,7 +50,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:29.6.2-cli@sha256:be132a9f282288de4afaf63379dff75711fda0147c6b72a9df44e51841402144 /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.7.0-cli@sha256:206ae9cc405101ab0cf97d4b515d21bf6aae961f98f7f9d8de6c111718fef335 /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
