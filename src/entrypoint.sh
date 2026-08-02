@@ -90,7 +90,16 @@ if [ -n "$NB_SETUP_KEY" ]; then
 
     unset NB_CONFIG
     netbird service run --config "$NETBIRD_CONFIG_PATH" &
-    sleep 3
+
+    echo "   ⏳ Waiting for NetBird daemon to initialize..."
+    for i in {1..15}; do
+        if [ -S "/var/run/netbird/netbird.sock" ]; then
+            break
+        fi
+        sleep 1
+    done
+    sleep 2
+
     NB_HOSTNAME="${NB_HOSTNAME:-$(hostname)}"
 
     MANAGEMENT_ARG=""
@@ -102,11 +111,39 @@ if [ -n "$NB_SETUP_KEY" ]; then
     EXTRA_FLAGS=${NB_FLAGS:-"--disable-dns"}
     echo "   Using Flags: $EXTRA_FLAGS"
 
-    netbird up --hostname="${NB_HOSTNAME}" \
-               $MANAGEMENT_ARG \
-               $EXTRA_FLAGS
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    UP_SUCCESS=false
 
-    echo "✅ NetBird started. Hostname: $NB_HOSTNAME"
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        NB_UP_OUT=$(netbird up --hostname="${NB_HOSTNAME}" $MANAGEMENT_ARG $EXTRA_FLAGS 2>&1)
+        if [ $? -eq 0 ]; then
+            UP_SUCCESS=true
+            echo "$NB_UP_OUT"
+            break
+        else
+            echo "$NB_UP_OUT"
+            if echo "$NB_UP_OUT" | grep -qi "operation not permitted"; then
+                echo "❌ CRITICAL ERROR: NetBird was denied permission to create its network interface."
+                echo "   This means your container is missing required kernel capabilities."
+                echo "   Please update your docker-compose.yml to include:"
+                echo "   cap_add:"
+                echo "     - NET_ADMIN"
+                echo "     - SYS_ADMIN"
+                echo "     - SYS_RESOURCE"
+                break
+            fi
+            echo "⚠️  NetBird up failed. Retrying in 3 seconds... ($((RETRY_COUNT+1))/$MAX_RETRIES)"
+            sleep 3
+            RETRY_COUNT=$((RETRY_COUNT+1))
+        fi
+    done
+
+    if [ "$UP_SUCCESS" = true ]; then
+        echo "✅ NetBird started. Hostname: $NB_HOSTNAME"
+    else
+        echo "❌ NetBird failed to start after $MAX_RETRIES attempts."
+    fi
 else
     echo "⚠️  NB_SETUP_KEY not found. Skipping NetBird start."
 fi
