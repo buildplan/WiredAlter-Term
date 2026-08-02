@@ -89,7 +89,7 @@ COPY --from=builder --chown=node:node /app /app
 
 # Setup Seed Directories & Download Font
 # renovate: datasource=github-tags depName=ryanoasis/nerd-fonts
-ARG NERDFONT_VERSION=v3.4.0
+ARG NERDFONT_VERSION=v3.5.0
 RUN mkdir -p /usr/local/share/smart-term/defaults \
              /usr/local/share/smart-term/fonts \
              /usr/local/share/smart-term/config && \
