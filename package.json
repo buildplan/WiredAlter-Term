@@ -1,6 +1,6 @@
 {
   "name": "wiredalter-term",
-  "version": "0.5",
+  "version": "0.12",
   "description": "A self-hosted web terminal with persistent storage and file management.",
   "type": "module",
   "private": true,
@@ -53,8 +53,5 @@
     "esbuild": "^0.28.1",
     "supertest": "^7.2.2",
     "terser": "^5.49.0"
-  },
-  "overrides": {
-    "ws": "^8.21.1"
   }
 }
