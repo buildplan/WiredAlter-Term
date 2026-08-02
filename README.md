@@ -117,6 +117,8 @@ To expose the terminal over NetBird instead of the public internet:
     # [Required for NetBird] Uncomment the following lines if using NetBird
     cap_add:
       - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
     devices:
       - /dev/net/tun
       

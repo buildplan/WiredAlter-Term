@@ -1,6 +1,6 @@
 services:
   docker-proxy:
-    image: lscr.io/linuxserver/socket-proxy:3.4.3
+    image: lscr.io/linuxserver/socket-proxy:3.4.3@sha256:5253050dd304d351df2ee61bba43c57dd2b19bb640497a679592051de3a3c639
     container_name: docker-proxy
     environment:
       - CONTAINERS=1   # docker ps
@@ -47,6 +47,8 @@ services:
     # [Required for NetBird] Uncomment the following lines if using NetBird
     # cap_add:
     #   - NET_ADMIN
+    #   - SYS_ADMIN
+    #   - SYS_RESOURCE
     # devices:
     #   - /dev/net/tun
     environment:
