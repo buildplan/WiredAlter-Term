@@ -55,7 +55,7 @@ COPY --from=docker:29.7.1-cli@sha256:27a51d5ab1cd38d9eeaba7b415b8c07bc10c31e1cf1
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
 ARG STARSHIP_VERSION=v1.26.0
-RUN curl -sS https://starship.rs/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
+RUN curl -sS https://raw.githubusercontent.com/starship/starship/${STARSHIP_VERSION}/install/install.sh | sh -s -- -y --version ${STARSHIP_VERSION}
 
 # Install Tailscale
 COPY --from=docker.io/tailscale/tailscale:v1.98.10@sha256:cdf5612ded5be1344f1a704b8c5e53496db97376bb533e5e15f141e48bf60cc0 /usr/local/bin/tailscaled /usr/local/bin/tailscaled
