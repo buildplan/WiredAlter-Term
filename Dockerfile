@@ -1,5 +1,5 @@
 # Use Node.js 26 on Debian 13
-FROM node:26.5.1-trixie-slim@sha256:deae974a69e140f44f434ab29cb519fb5f8fe250fd364b8ca446bd0761acdc6a AS builder
+FROM node:26.6.0-trixie-slim@sha256:3829969d36c61954b61910fec22deef08d9c3c7513e4ca54c54b0e50e8ae6962 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm prune --omit=dev && \
     rm -rf node_modules/node-pty/prebuilds/darwin-* && \
     rm -rf node_modules/node-pty/prebuilds/win32-*
 
-FROM node:26.5.1-trixie-slim@sha256:deae974a69e140f44f434ab29cb519fb5f8fe250fd364b8ca446bd0761acdc6a
+FROM node:26.6.0-trixie-slim@sha256:3829969d36c61954b61910fec22deef08d9c3c7513e4ca54c54b0e50e8ae6962
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
