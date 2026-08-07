@@ -63,7 +63,7 @@ COPY --from=docker.io/tailscale/tailscale:v1.98.10@sha256:cdf5612ded5be1344f1a70
 RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
 
 # Install NetBird
-COPY --from=docker.io/netbirdio/netbird:0.76.1@sha256:c3d8ca93ee3b3564cc2c595148183b24dcdc78cd4942b4eb07750cbda31ac173 /usr/local/bin/netbird /usr/local/bin/netbird
+COPY --from=docker.io/netbirdio/netbird:0.76.2@sha256:597a57aaf7d92de724996ccd887c2090eda6eccdf733955eb7986ebb652a2560 /usr/local/bin/netbird /usr/local/bin/netbird
 RUN mkdir -p /var/lib/netbird /var/run/netbird /etc/netbird && chown node:node /var/run/netbird /var/lib/netbird /etc/netbird
 
 # Install asciinema
