@@ -1,6 +1,6 @@
 services:
   docker-proxy:
-    image: lscr.io/linuxserver/socket-proxy:3.4.3@sha256:5253050dd304d351df2ee61bba43c57dd2b19bb640497a679592051de3a3c639
+    image: lscr.io/linuxserver/socket-proxy:3.4.4@sha256:c0e905167a19a756f47e7fcf724ac08e47a883238ef2e1dfb1bd62e94d481ce5
     container_name: docker-proxy
     environment:
       - CONTAINERS=1   # docker ps
