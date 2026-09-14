@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^14.0.0",
-    "@simplewebauthn/server": "^14.0.1",
+    "@simplewebauthn/server": "^14.0.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-serialize": "^0.14.0",
@@ -44,7 +44,7 @@
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
-    "multer": "^2.3.0",
+    "multer": "^2.4.0",
     "node-pty": "^1.1.0",
     "socket.io": "^4.8.3",
     "sortablejs": "^1.15.7"
