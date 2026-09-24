@@ -42,6 +42,7 @@ jobs:
 
       # Create a GitHub Release based on that tag
       - name: Create a GitHub Release
+        if: steps.tag_version.outputs.new_tag != ''
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
