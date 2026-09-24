@@ -32,7 +32,7 @@ jobs:
       # Calculate the next version
       - name: Bump version and push tag
         id: tag_version
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: mathieudutour/github-tag-action@af99e60ce8132224b8e6ebab5023449fe256ed46 # v7.0.0
         with:
           github_token: ${{ secrets.PAT_TOKEN }}
           default_bump: patch
@@ -42,6 +42,7 @@ jobs:
 
       # Create a GitHub Release based on that tag
       - name: Create a GitHub Release
+        if: steps.tag_version.outputs.new_tag != ''
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
