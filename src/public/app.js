@@ -152,11 +152,16 @@ if (e2eeModalCancel) {
     });
 }
 if (e2eeBtn) {
-    e2eeBtn.addEventListener('click', () => {
+    e2eeBtn.addEventListener('click', async () => {
         const activeTab = window.tabManager?.getActiveTab();
         if (!activeTab) return;
         if (activeTab.e2ee && activeTab.e2ee.isReady) {
-            alert('This terminal tab is end-to-end encrypted (E2EE Active 🔒). Keystrokes and screen buffers are shielded from proxy inspection.');
+            const msg = 'This terminal tab is end-to-end encrypted (E2EE Active 🔒).\n\nKeystrokes, passwords, and screen buffers are shielded from proxy inspection.';
+            if (typeof window.showCustomAlert === 'function') {
+                await window.showCustomAlert(msg, 'E2EE Status');
+            } else {
+                alert(msg);
+            }
         } else {
             activeTab.initiateE2EE();
         }
@@ -1254,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.showModal();
         });
     }
+    window.showCustomAlert = showCustomAlert;
 
     function showCustomPrompt(message, title = "Input Required") {
         return new Promise(resolve => {

@@ -263,11 +263,31 @@ app.post('/logout', (req, res) => {
 // --- WEBAUTHN (PASSKEYS) ---
 const rpName = 'WiredTerm';
 
-const getRpID = (req) => process.env.RP_ID || req.hostname;
+const getRpID = (req) => {
+    if (process.env.RP_ID) return process.env.RP_ID;
+    if (req.hostname) return req.hostname;
+    const hostHeader = (typeof req.get === 'function' ? (req.get('x-forwarded-host') || req.get('host')) : (req.headers?.['x-forwarded-host'] || req.headers?.host)) || '';
+    try {
+        return new URL('http://' + hostHeader).hostname || 'localhost';
+    } catch {
+        return hostHeader.split(':')[0] || 'localhost';
+    }
+};
+
 const getOrigin = (req) => {
     if (process.env.ORIGIN) return process.env.ORIGIN;
-    if (req.headers.origin) return req.headers.origin;
-    return `${req.protocol}://${req.get('host')}`;
+    if (req.headers?.origin) return req.headers.origin;
+    const host = (typeof req.get === 'function' ? (req.get('x-forwarded-host') || req.get('host')) : (req.headers?.['x-forwarded-host'] || req.headers?.host)) || 'localhost:3939';
+    const proto = req.protocol || (req.connection?.encrypted || req.socket?.encrypted || req.headers?.['x-forwarded-proto'] === 'https' ? 'https' : 'http');
+    return `${proto}://${host}`;
+};
+
+const toBuffer = (val) => {
+    if (!val) return Buffer.alloc(0);
+    if (Buffer.isBuffer(val)) return val;
+    if (val instanceof ArrayBuffer) return Buffer.from(val);
+    if (ArrayBuffer.isView(val)) return Buffer.from(val.buffer, val.byteOffset, val.byteLength);
+    return Buffer.from(val);
 };
 
 app.get('/webauthn/register-options', async (req, res) => {
@@ -644,19 +664,19 @@ io.on('connection', (socket) => {
                 const { clientEcdhPub, webauthnAssertion, encryptedProof } = data;
                 if (!clientEcdhPub || !webauthnAssertion || !encryptedProof) {
                     socket.emit('e2ee:error', 'Missing passkey verification parameters');
-                    socket.disconnect(true);
+                    setTimeout(() => socket.disconnect(true), 500);
                     return;
                 }
                 const passkey = db.prepare('SELECT * FROM passkeys WHERE id = ?').get(webauthnAssertion.id);
                 if (!passkey) {
                     socket.emit('e2ee:error', 'Passkey not found');
-                    socket.disconnect(true);
+                    setTimeout(() => socket.disconnect(true), 500);
                     return;
                 }
                 const boundChallenge = computeTranscriptChallenge(
                     e2ee.serverNonce,
                     e2ee.serverEcdhPub,
-                    Buffer.from(clientEcdhPub),
+                    toBuffer(clientEcdhPub),
                     e2ee.salt
                 );
                 const verification = await verifyAuthenticationResponse({
@@ -672,7 +692,7 @@ io.on('connection', (socket) => {
                 });
                 if (!verification.verified) {
                     socket.emit('e2ee:error', 'Passkey verification failed');
-                    socket.disconnect(true);
+                    setTimeout(() => socket.disconnect(true), 500);
                     return;
                 }
 
@@ -684,23 +704,23 @@ io.on('connection', (socket) => {
 
                 // Verify ECDH key and proof of key possession
                 const okProof = await e2ee.verifyECDHKeyAndProof(
-                    Buffer.from(clientEcdhPub),
-                    Buffer.from(encryptedProof)
+                    toBuffer(clientEcdhPub),
+                    toBuffer(encryptedProof)
                 );
                 if (!okProof) {
                     socket.emit('e2ee:error', 'ECDH key proof failed');
-                    socket.disconnect(true);
+                    setTimeout(() => socket.disconnect(true), 500);
                     return;
                 }
             } else {
                 const encryptedProof = data.encryptedProof || data;
                 const ok = await e2ee.verifyPassphraseHandshake(
                     E2EE_PASSPHRASE,
-                    Buffer.from(encryptedProof)
+                    toBuffer(encryptedProof)
                 );
                 if (!ok) {
                     socket.emit('e2ee:error', 'Invalid encryption passphrase');
-                    socket.disconnect(true);
+                    setTimeout(() => socket.disconnect(true), 500);
                     return;
                 }
             }
@@ -723,9 +743,9 @@ io.on('connection', (socket) => {
                 });
             }
         } catch (err) {
-            console.error("E2EE verification error:", err.message);
-            socket.emit('e2ee:error', 'Verification error');
-            socket.disconnect(true);
+            console.error("E2EE verification error:", err);
+            socket.emit('e2ee:error', err.message || 'Verification error');
+            setTimeout(() => socket.disconnect(true), 500);
         }
     });
 

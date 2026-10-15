@@ -283,4 +283,140 @@ describe('E2EE Handshake & Ephemeral ECDH Interoperability', () => {
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(clientReceivedText, 'total 42\ndrwxr-xr-x ...');
   });
+
+  it('runs complete end-to-end exchange between ClientE2EESession and ServerE2EESession (Mode A)', async () => {
+    await import('../src/public/e2ee-client.js');
+    const ClientE2EESession = globalThis.ClientE2EESession;
+
+    const serverSession = new ServerE2EESession();
+    const clientSession = new ClientE2EESession();
+
+    const challengePayload = serverSession.initChallenge('passkey', { rpId: 'localhost' });
+    assert.equal(challengePayload.mode, 'passkey');
+
+    // Mock startAuthentication to return a valid dummy assertion object
+    const mockStartAuth = async (optionsJSON) => {
+      assert.ok(optionsJSON.challenge);
+      return {
+        id: 'test-passkey-id',
+        rawId: 'test-raw-id',
+        response: {
+          clientDataJSON: Buffer.from(JSON.stringify({
+            type: 'webauthn.get',
+            challenge: optionsJSON.challenge,
+            origin: 'http://localhost:3939'
+          })).toString('base64url'),
+          authenticatorData: 'test-auth-data',
+          signature: 'test-sig'
+        },
+        type: 'public-key'
+      };
+    };
+
+    const clientHandshake = await clientSession.completePasskeyChallenge(
+      challengePayload,
+      mockStartAuth
+    );
+    assert.equal(clientHandshake.mode, 'passkey');
+    assert.ok(clientHandshake.clientEcdhPub);
+    assert.ok(clientHandshake.encryptedProof);
+
+    // Verify transcript challenge matches
+    const boundChallenge = computeTranscriptChallenge(
+      serverSession.serverNonce,
+      serverSession.serverEcdhPub,
+      Buffer.from(clientHandshake.clientEcdhPub),
+      serverSession.salt
+    );
+    assert.equal(clientHandshake.webauthnAssertion.response.clientDataJSON, Buffer.from(JSON.stringify({
+      type: 'webauthn.get',
+      challenge: boundChallenge,
+      origin: 'http://localhost:3939'
+    })).toString('base64url'));
+
+    // Verify server verifies proof
+    const okProof = await serverSession.verifyECDHKeyAndProof(
+      Buffer.from(clientHandshake.clientEcdhPub),
+      Buffer.from(clientHandshake.encryptedProof)
+    );
+    assert.equal(okProof, true);
+    assert.equal(serverSession.isVerified, true);
+    clientSession.markReady();
+
+    // Stream roundtrip
+    let clientWire = null;
+    clientSession.enqueueEncryptInput('uname -a\n', (buf) => {
+      clientWire = Buffer.from(buf);
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(clientWire);
+
+    const serverDecrypted = serverSession.decryptInput(clientWire);
+    assert.equal(serverDecrypted.toString('utf8'), 'uname -a\n');
+
+    const serverOutputFrame = serverSession.encryptOutput('Linux 6.6.0 x86_64\n');
+    let clientDecrypted = null;
+    clientSession.enqueueDecryptOutput(serverOutputFrame, (txt) => {
+      clientDecrypted = txt;
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(clientDecrypted, 'Linux 6.6.0 x86_64\n');
+  });
 });
+
+describe('WebAuthn Request Resolution Helpers (RP ID & Origin)', () => {
+  const getRpID = (req) => {
+    if (process.env.RP_ID) return process.env.RP_ID;
+    if (req.hostname) return req.hostname;
+    const hostHeader = (typeof req.get === 'function' ? (req.get('x-forwarded-host') || req.get('host')) : (req.headers?.['x-forwarded-host'] || req.headers?.host)) || '';
+    try {
+      return new URL('http://' + hostHeader).hostname || 'localhost';
+    } catch {
+      return hostHeader.split(':')[0] || 'localhost';
+    }
+  };
+
+  const getOrigin = (req) => {
+    if (process.env.ORIGIN) return process.env.ORIGIN;
+    if (req.headers?.origin) return req.headers.origin;
+    const host = (typeof req.get === 'function' ? (req.get('x-forwarded-host') || req.get('host')) : (req.headers?.['x-forwarded-host'] || req.headers?.host)) || 'localhost:3939';
+    const proto = req.protocol || (req.connection?.encrypted || req.socket?.encrypted || req.headers?.['x-forwarded-proto'] === 'https' ? 'https' : 'http');
+    return `${proto}://${host}`;
+  };
+
+  it('correctly resolves RP ID and Origin for standard Express requests', () => {
+    const expressReq = {
+      hostname: 'term.example.com',
+      protocol: 'https',
+      get: (h) => (h === 'host' ? 'term.example.com' : undefined),
+      headers: { host: 'term.example.com' }
+    };
+    assert.equal(getRpID(expressReq), 'term.example.com');
+    assert.equal(getOrigin(expressReq), 'https://term.example.com');
+  });
+
+  it('correctly resolves RP ID and Origin for WebSocket socket.request (http.IncomingMessage)', () => {
+    // socket.request lacks .hostname and .get()
+    const socketReq = {
+      headers: {
+        host: 'localhost:3939',
+        origin: 'http://localhost:3939'
+      }
+    };
+    assert.equal(getRpID(socketReq), 'localhost');
+    assert.equal(getOrigin(socketReq), 'http://localhost:3939');
+  });
+
+  it('correctly resolves RP ID and Origin behind reverse proxy with X-Forwarded headers', () => {
+    const proxyReq = {
+      headers: {
+        'x-forwarded-host': 'terminal.corp.internal:443',
+        'x-forwarded-proto': 'https',
+        host: 'internal-pod:3939'
+      }
+    };
+    assert.equal(getRpID(proxyReq), 'terminal.corp.internal');
+    assert.equal(getOrigin(proxyReq), 'https://terminal.corp.internal:443');
+  });
+});
+

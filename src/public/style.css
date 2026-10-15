@@ -604,9 +604,15 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     padding: 20px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     color: var(--text-main);
-    width: 300px;
+    width: 360px;
     max-width: 90vw;
     font-family: inherit;
+}
+
+#custom-modal-text {
+    white-space: pre-line;
+    line-height: 1.5;
+    word-break: break-word;
 }
 
 .custom-modal::backdrop {
