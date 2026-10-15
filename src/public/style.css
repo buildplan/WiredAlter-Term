@@ -604,9 +604,15 @@ html.light .drop-overlay { background: rgba(255, 255, 255, 0.9); }
     padding: 20px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     color: var(--text-main);
-    width: 300px;
+    width: 360px;
     max-width: 90vw;
     font-family: inherit;
+}
+
+#custom-modal-text {
+    white-space: pre-line;
+    line-height: 1.5;
+    word-break: break-word;
 }
 
 .custom-modal::backdrop {
@@ -704,4 +710,40 @@ html.light .custom-modal::backdrop {
     .status { font-size: 1.2rem; }
     .logout-btn { padding: 5px 8px; font-size: 1rem; }
     .mobile-keyboard-bar { display: flex; }
+}
+
+/* --- E2EE BUTTON & BADGES --- */
+.e2ee-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--btn-bg);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.e2ee-btn:hover {
+    background: var(--btn-hover-bg);
+}
+
+.e2ee-btn.e2ee-active {
+    color: #7ee787 !important;
+    border-color: #238636 !important;
+    background: rgba(35, 134, 54, 0.15) !important;
+}
+
+.e2ee-btn.e2ee-plaintext {
+    color: #e0af68 !important;
+    border-color: #d29922 !important;
+    background: rgba(210, 153, 34, 0.1) !important;
+}
+
+.e2ee-label {
+    font-size: 0.75rem;
+    font-weight: 600;
 }

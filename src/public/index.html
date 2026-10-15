@@ -61,6 +61,11 @@
             </div>
 
             <div class="header-right controls">
+                <button id="e2ee-status-btn" class="icon-btn e2ee-btn" title="End-to-End Encryption Status (Click to configure)">
+                    <span id="e2ee-icon-locked" style="display:none;">🔒</span>
+                    <span id="e2ee-icon-unlocked">🔓</span>
+                    <span id="e2ee-label" class="e2ee-label">E2EE</span>
+                </button>
                 <button id="mouse-mode-btn" class="icon-btn" title="Toggle Mouse Reporting (Turn OFF to Select/Copy)">
                     <svg id="icon-mouse-on" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="5" y="2" width="14" height="20" rx="7"></rect>
@@ -213,8 +218,42 @@
         </div>
     </dialog>
 
+    <dialog id="e2ee-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <h3 style="margin-top: 0; color: var(--text-title); display: flex; align-items: center; gap: 8px;">
+                <span>🔒</span> <span>Encrypted Session (E2EE)</span>
+            </h3>
+            <p style="color: var(--text-main); font-size: 0.88rem; line-height: 1.4; margin-bottom: 12px;">
+                Protect keystrokes, passwords, and terminal buffers from network inspection and TLS forward proxies.
+            </p>
+
+            <div id="e2ee-passkey-container" style="display: none; margin-top: 15px;">
+                <button id="e2ee-passkey-btn" class="icon-btn" style="width: 100%; padding: 10px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span>📱</span> <span>Unlock with Passkey / Phone</span>
+                </button>
+            </div>
+
+            <div id="e2ee-or-divider" style="margin: 14px 0; text-align: center; color: var(--text-main); font-size: 0.78rem; display: none;">
+                — OR ENTER PASSPHRASE —
+            </div>
+
+            <div id="e2ee-passphrase-container" style="display: none; margin-top: 10px;">
+                <label for="e2ee-passphrase-input" style="display: block; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px;">Session Encryption Passphrase</label>
+                <input type="password" id="e2ee-passphrase-input" placeholder="Enter session passphrase..." style="width: 100%; box-sizing: border-box; background: var(--term-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; outline: none; font-family: inherit;" />
+            </div>
+
+            <div id="e2ee-feedback-msg" style="margin-top: 10px; font-size: 0.82rem; color: #f85149; min-height: 16px;"></div>
+
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="e2ee-modal-cancel" class="icon-btn" style="display: none;">Cancel</button>
+                <button id="e2ee-modal-submit" class="icon-btn" style="background: var(--text-title); color: #fff; border-color: var(--text-title); display: none;">Unlock</button>
+            </div>
+        </div>
+    </dialog>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/vendor/simplewebauthn/index.umd.min.js"></script>
-    <script src="app.js?v=4.1"></script>
+    <script src="e2ee-client.js?v=4.2"></script>
+    <script src="app.js?v=4.2"></script>
 </body>
 </html>
