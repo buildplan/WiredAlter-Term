@@ -1,5 +1,5 @@
 # Use Node.js 26 on Debian 13
-FROM node:26.11.1-trixie-slim@sha256:193fe51b64e77981119c98c2002c9e32a70e2f006fb4d25068ce0558998917f0 AS builder
+FROM node:26.12.0-trixie-slim@sha256:0d1e33586362bb9e608c4e751e7a9e7edb55c9ac11461ed5666af696cc461dd4 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN npm prune --omit=dev && \
     rm -rf node_modules/node-pty/prebuilds/darwin-* && \
     rm -rf node_modules/node-pty/prebuilds/win32-*
 
-FROM node:26.11.1-trixie-slim@sha256:193fe51b64e77981119c98c2002c9e32a70e2f006fb4d25068ce0558998917f0
+FROM node:26.12.0-trixie-slim@sha256:0d1e33586362bb9e608c4e751e7a9e7edb55c9ac11461ed5666af696cc461dd4
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install runtime tools.
@@ -63,7 +63,7 @@ COPY --from=docker.io/tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bce
 RUN mkdir -p /var/lib/tailscale /var/run/tailscale && chown node:node /var/run/tailscale
 
 # Install NetBird
-COPY --from=docker.io/netbirdio/netbird:0.80.0@sha256:4976692ea44bb93871743d0b742b4a8f97f6425bfc458ca2d78e28fdb8bdf4ad /usr/local/bin/netbird /usr/local/bin/netbird
+COPY --from=docker.io/netbirdio/netbird:0.81.0@sha256:e3169e685c18778cdae93a35899567a45d94afe19eb8cafaecec0c306482bd7a /usr/local/bin/netbird /usr/local/bin/netbird
 RUN mkdir -p /var/lib/netbird /var/run/netbird /etc/netbird && chown node:node /var/run/netbird /var/lib/netbird /etc/netbird
 
 # Install asciinema
