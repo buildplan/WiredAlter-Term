@@ -14,6 +14,7 @@ import multer from 'multer';
 import compression from 'compression';
 import os from 'os';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
+import { ServerE2EESession, computeTranscriptChallenge, E2EE_CONSTANTS } from './e2ee.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_TEST = process.env.NODE_ENV === 'test';
@@ -65,6 +66,19 @@ db.exec(`
     value TEXT
   );
 `);
+
+// --- E2EE CONFIGURATION & PRE-FLIGHT ---
+const E2EE_PASSPHRASE = process.env.E2EE_PASSPHRASE;
+const FORCE_E2EE = process.env.FORCE_E2EE === 'true' || (Boolean(E2EE_PASSPHRASE) && process.env.FORCE_E2EE !== 'false');
+const E2EE_PBKDF2_ITERATIONS = parseInt(process.env.E2EE_PBKDF2_ITERATIONS, 10) || E2EE_CONSTANTS.PBKDF2_DEFAULT_ITERATIONS;
+
+if (process.env.FORCE_E2EE === 'true' && !IS_TEST) {
+    const passkeyCount = db.prepare('SELECT COUNT(*) as c FROM passkeys').get()?.c || 0;
+    if (!E2EE_PASSPHRASE && passkeyCount === 0) {
+        console.error("❌ FATAL: FORCE_E2EE=true is set, but neither E2EE_PASSPHRASE is configured nor are any passkeys registered in the database.");
+        process.exit(1);
+    }
+}
 
 // --- 1. SESSION STORE ---
 class NativeSQLiteStore extends session.Store {
@@ -534,6 +548,21 @@ io.on('connection', (socket) => {
         return;
     }
 
+    const e2ee = new ServerE2EESession(E2EE_PBKDF2_ITERATIONS);
+    const passkeyRows = db.prepare('SELECT COUNT(*) as c FROM passkeys').get();
+    const hasPasskeys = (passkeyRows?.c || 0) > 0;
+    const availableModes = {
+        passkey: hasPasskeys,
+        passphrase: Boolean(E2EE_PASSPHRASE)
+    };
+
+    // Emit initial status so client knows if E2EE is required, available, and iterations
+    socket.emit('e2ee:status', {
+        forceE2EE: FORCE_E2EE,
+        availableModes,
+        iterations: E2EE_PBKDF2_ITERATIONS
+    });
+
     const tabId = socket.handshake.query.tabId || 'main';
     const cleanEnv = { ...process.env, TERM: 'xterm-256color', WIRED_TAB_ID: tabId };
     delete cleanEnv.TMUX;
@@ -542,26 +571,208 @@ io.on('connection', (socket) => {
     const initCols = parseInt(socket.handshake.query.cols, 10) || 80;
     const initRows = parseInt(socket.handshake.query.rows, 10) || 30;
 
-    const ptyProcess = pty.spawn('bash', [], {
-        name: 'xterm-256color',
-        cols: initCols,
-        rows: initRows,
-        cwd: process.env.HOME,
-        env: cleanEnv
+    let ptyProcess = null;
+
+    const startPtyProcess = () => {
+        if (ptyProcess) return;
+        ptyProcess = pty.spawn('bash', [], {
+            name: 'xterm-256color',
+            cols: initCols,
+            rows: initRows,
+            cwd: process.env.HOME,
+            env: cleanEnv
+        });
+
+        if (e2ee.isVerified) {
+            ptyProcess.onData((data) => {
+                try {
+                    const enc = e2ee.encryptOutput(data);
+                    socket.emit('terminal:output:enc', enc);
+                } catch (err) {
+                    console.error("Encryption output failed:", err.message);
+                }
+            });
+        } else {
+            ptyProcess.onData((data) => socket.emit('terminal:output', data));
+        }
+
+        ptyProcess.on('exit', (code, signal) => {
+            console.log(`PTY exited with code ${code}. Closing socket.`);
+            socket.disconnect();
+        });
+    };
+
+    // Delay PTY spawning in Strict Mode until e2ee:verify succeeds!
+    if (!FORCE_E2EE) {
+        startPtyProcess();
+    }
+
+    // --- E2EE Handshake Handlers ---
+    socket.on('e2ee:init', async (data) => {
+        const mode = data?.mode || (hasPasskeys ? 'passkey' : 'passphrase');
+        if (mode === 'passkey') {
+            if (!hasPasskeys) {
+                socket.emit('e2ee:error', 'No passkeys registered in database');
+                return;
+            }
+            try {
+                const passkeys = db.prepare('SELECT id FROM passkeys').all();
+                const webauthnOptions = await generateAuthenticationOptions({
+                    rpID: getRpID(req),
+                    allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
+                    userVerification: 'preferred',
+                });
+                const challengePayload = e2ee.initChallenge('passkey', webauthnOptions);
+                socket.emit('e2ee:challenge', challengePayload);
+            } catch (err) {
+                socket.emit('e2ee:error', err.message);
+            }
+        } else {
+            if (!E2EE_PASSPHRASE) {
+                socket.emit('e2ee:error', 'Server has no E2EE_PASSPHRASE configured');
+                return;
+            }
+            const challengePayload = e2ee.initChallenge('passphrase');
+            socket.emit('e2ee:challenge', challengePayload);
+        }
     });
-    ptyProcess.onData((data) => socket.emit('terminal:output', data));
-    ptyProcess.on('exit', (code, signal) => { console.log(`PTY exited with code ${code}. Closing socket.`); socket.disconnect(); });
+
+    socket.on('e2ee:verify', async (data) => {
+        if (!data) return;
+        try {
+            if (data.mode === 'passkey') {
+                const { clientEcdhPub, webauthnAssertion, encryptedProof } = data;
+                if (!clientEcdhPub || !webauthnAssertion || !encryptedProof) {
+                    socket.emit('e2ee:error', 'Missing passkey verification parameters');
+                    socket.disconnect(true);
+                    return;
+                }
+                const passkey = db.prepare('SELECT * FROM passkeys WHERE id = ?').get(webauthnAssertion.id);
+                if (!passkey) {
+                    socket.emit('e2ee:error', 'Passkey not found');
+                    socket.disconnect(true);
+                    return;
+                }
+                const boundChallenge = computeTranscriptChallenge(
+                    e2ee.serverNonce,
+                    e2ee.serverEcdhPub,
+                    Buffer.from(clientEcdhPub),
+                    e2ee.salt
+                );
+                const verification = await verifyAuthenticationResponse({
+                    response: webauthnAssertion,
+                    expectedChallenge: boundChallenge,
+                    expectedOrigin: getOrigin(req),
+                    expectedRPID: getRpID(req),
+                    credential: {
+                        id: passkey.id,
+                        publicKey: new Uint8Array(Buffer.from(passkey.publicKey, 'base64')),
+                        counter: passkey.counter,
+                    },
+                });
+                if (!verification.verified) {
+                    socket.emit('e2ee:error', 'Passkey verification failed');
+                    socket.disconnect(true);
+                    return;
+                }
+
+                // Update counter in SQLite for cloned-authenticator detection
+                db.prepare('UPDATE passkeys SET counter = ? WHERE id = ?').run(
+                    verification.authenticationInfo.newCounter,
+                    passkey.id
+                );
+
+                // Verify ECDH key and proof of key possession
+                const okProof = await e2ee.verifyECDHKeyAndProof(
+                    Buffer.from(clientEcdhPub),
+                    Buffer.from(encryptedProof)
+                );
+                if (!okProof) {
+                    socket.emit('e2ee:error', 'ECDH key proof failed');
+                    socket.disconnect(true);
+                    return;
+                }
+            } else {
+                const encryptedProof = data.encryptedProof || data;
+                const ok = await e2ee.verifyPassphraseHandshake(
+                    E2EE_PASSPHRASE,
+                    Buffer.from(encryptedProof)
+                );
+                if (!ok) {
+                    socket.emit('e2ee:error', 'Invalid encryption passphrase');
+                    socket.disconnect(true);
+                    return;
+                }
+            }
+
+            socket.emit('e2ee:ready', { mode: e2ee.mode });
+
+            // If PTY not yet spawned (Strict Mode), spawn it now!
+            if (!ptyProcess) {
+                startPtyProcess();
+            } else {
+                // In optional mode, transition existing PTY to encrypted output listener
+                ptyProcess.removeAllListeners('data');
+                ptyProcess.onData((ptyData) => {
+                    try {
+                        const enc = e2ee.encryptOutput(ptyData);
+                        socket.emit('terminal:output:enc', enc);
+                    } catch (err) {
+                        console.error("Encryption output failed:", err.message);
+                    }
+                });
+            }
+        } catch (err) {
+            console.error("E2EE verification error:", err.message);
+            socket.emit('e2ee:error', 'Verification error');
+            socket.disconnect(true);
+        }
+    });
+
+    // Encrypted terminal handlers
+    socket.on('terminal:input:enc', (wireBuffer) => {
+        if (!e2ee.isVerified || !ptyProcess) return;
+        try {
+            const plaintextBuf = e2ee.decryptInput(wireBuffer);
+            ptyProcess.write(plaintextBuf.toString('utf8'));
+        } catch (err) {
+            console.error("Failed to decrypt terminal input:", err.message);
+            socket.disconnect(true);
+        }
+    });
+
+    socket.on('terminal:resize:enc', (wireBuffer) => {
+        if (!e2ee.isVerified || !ptyProcess) return;
+        try {
+            const plaintextBuf = e2ee.decryptInput(wireBuffer);
+            const { cols, rows } = JSON.parse(plaintextBuf.toString('utf8'));
+            const safeCols = Math.max(1, Math.min(1000, cols || 80));
+            const safeRows = Math.max(1, Math.min(1000, rows || 30));
+            ptyProcess.resize(safeCols, safeRows);
+        } catch (err) {
+            console.error("Failed to decrypt terminal resize:", err.message);
+            socket.disconnect(true);
+        }
+    });
+
+    // Plaintext input (only allowed if NOT enforced and NOT verified)
     socket.on('terminal:input', (data) => {
-        if (typeof data !== 'string') return;
+        if (FORCE_E2EE || e2ee.isVerified) return;
+        if (typeof data !== 'string' || !ptyProcess) return;
         try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
     });
     socket.on('terminal:resize', ({ cols, rows }) => {
+        if (FORCE_E2EE || e2ee.isVerified) return;
+        if (!ptyProcess) return;
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
         try { ptyProcess.resize(safeCols, safeRows); }
         catch (err) { console.warn('Resize failed:', err.message); }
     });
-    socket.on('disconnect', () => ptyProcess.kill());
+
+    socket.on('disconnect', () => {
+        if (ptyProcess) ptyProcess.kill();
+    });
     socket.on('latency:ping', (timestamp) => {
         socket.emit('latency:pong', timestamp);
         if (req.session) {
@@ -588,7 +799,7 @@ io.on('connection', (socket) => {
 });
 
 // --- EXPORT FOR TESTING ---
-export { app };
+export { app, httpServer };
 
 // --- START SERVER ---
 if (!IS_TEST) {

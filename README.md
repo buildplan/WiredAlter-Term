@@ -10,9 +10,36 @@ It provides a terminal environment in your browser with persistent configuration
 * **Persistent Sessions (tmux):** Terminal sessions automatically run inside `tmux`. If your browser disconnects, your background processes keep running.
 * **Secure Docker Control:** Maps the host's Docker socket through an isolated `socket-proxy` container. Read-only access is enforced by default, preventing unauthorised container creation or deletion while allowing `docker ps` and `docker exec`.
 * **Tailscale & NetBird Integration:** Built-in Tailscale/Headscale and NetBird support to expose the terminal exclusively to your private VPN network without opening public ports.
+* **End-to-End Encryption (E2EE):** Hardens terminal streams against inline TLS-decrypting forward proxies (Cisco, Zscaler, Palo Alto) using AES-GCM-256 with 64-byte padding. Supports Passkey (Phone/YubiKey) biometric unlock (zero keystrokes typed) and pre-shared passphrase fallback.
 * **Persistent Identity:** SSH keys (`~/.ssh`), Bash history, and shell configuration (`~/.bashrc`) persist across container restarts.
 * **General Storage:** A dedicated `~/storage` directory for saving downloads, scripts, or project files.
 * **Drag & Drop Uploads:** Drop files directly into the terminal window to upload them to the `/data/` directory.
+
+---
+
+## End-to-End Encryption (E2EE)
+
+WiredAlter-Term includes application-layer **End-to-End Encryption (E2EE)** operating directly inside the WebSocket channel. This prevents TLS-intercepting forward proxies, deep packet inspection (DPI) appliances, and corporate network sniffers from capturing typed passwords (`sudo`, SSH passphrases), private keys, or terminal buffer contents.
+
+### How It Works
+
+* **Wire Protocol:** Frames are encrypted using `AES-GCM-256` with 5-byte AAD (`[direction, sequence]`) anti-replay tracking.
+* **Side-Channel Elimination:** Fixed 64-byte block padding ensures single keystrokes and inputs $\le 60$ bytes produce identical **92-byte** wire blobs, masking command lengths and typing cadences.
+* **Delayed PTY Lifecycle:** In Strict Mode, the shell process is only spawned after the cryptographic handshake succeeds, eliminating pre-handshake MOTD/prompt leakage.
+
+### Authentication Modes
+
+1. **Passkey Unlock (Zero Typing):** Uses your phone (Face ID / Touch ID / QR cross-device) or hardware security key (YubiKey) via ephemeral P-256 ECDH bound into the WebAuthn signature. **No characters are typed on the corporate keyboard**, protecting against OS-level keyloggers.
+2. **Passphrase Fallback:** Derives a 256-bit key on both sides using asynchronous `PBKDF2-HMAC-SHA256` with a per-session random salt (the secret is never transmitted over the wire).
+
+### Configuration (`compose.yml`)
+
+```yaml
+environment:
+  - FORCE_E2EE=true           # Strictly enforces E2EE (rejects plaintext connections)
+  - E2EE_PASSPHRASE=mysecret  # Pre-shared passphrase for Mode B fallback
+  - E2EE_PBKDF2_ITERATIONS=100000 # PBKDF2 iterations (default: 100,000)
+```
 
 ---
 

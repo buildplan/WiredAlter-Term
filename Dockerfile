@@ -20,7 +20,8 @@ RUN mkdir -p src/public/vendor/xterm src/public/vendor/sortablejs src/public/ven
     cp node_modules/@xterm/addon-search/lib/addon-search.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-webgl/lib/addon-webgl.js src/public/vendor/xterm/ && \
     cp node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js src/public/vendor/xterm/
-RUN npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
+RUN npx terser src/public/e2ee-client.js -o src/public/e2ee-client.js --compress --mangle && \
+    npx terser src/public/app.js -o src/public/app.js --compress --mangle && \
     npx terser src/public/login.js -o src/public/login.js --compress --mangle && \
     npx esbuild src/public/style.css --minify --outfile=src/public/style.css --allow-overwrite
 

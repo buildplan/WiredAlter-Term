@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💻</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💻</text></svg>">
     <title>Restricted Access</title>
-    
+
     <link rel="stylesheet" href="style.css?v=2">
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <script src="/vendor/simplewebauthn/index.umd.min.js"></script>
     <script>
-        (function() {
+        (function () {
             const storedTheme = localStorage.getItem('wired-term-theme');
             if (storedTheme === 'light') {
                 document.documentElement.classList.add('light');
             }
         })();
     </script>
-    
+
     <style>
         .theme-toggle-login {
             background: transparent;
@@ -32,14 +34,18 @@
             opacity: 0.7;
             transition: opacity 0.2s;
         }
-        .theme-toggle-login:hover { opacity: 1; }
+
+        .theme-toggle-login:hover {
+            opacity: 1;
+        }
     </style>
 </head>
+
 <body class="login-body">
 
     <div class="login-container">
         <div class="terminal-header">
-            <span class="status-dot"></span> 
+            <span class="status-dot"></span>
             <span>SECURITY CHECK</span>
 
             <button id="theme-btn" class="theme-toggle-login" title="Toggle Theme">
@@ -50,44 +56,41 @@
 
         <div class="login-content">
 
-    <div class="ascii-art">
- _      _  ___  ___  ___  ___ 
-| | /| / ||_ _|| _ \| __||   \
-| |/ |/ | | | |   /| _| | |) |
-|__/|__/ |___||_|_\|___||___/ 
-  _____  ___  ___  __  __ 
- |_   _|| __|| _ \|  \/  |
-   | |  | _| |   /| |\/| |
-   |_|  |___||_|_\|_|  |_|
+            <div class="ascii-art">
+                _ _ ___ ___ ___ ___
+                | | /| / ||_ _|| _ \| __|| \
+                | |/ |/ | | | | /| _| | |) |
+                |__/|__/ |___||_|_\|___||___/
+                _____ ___ ___ __ __
+                |_ _|| __|| _ \| \/ |
+                | | | _| | /| |\/| |
+                |_| |___||_|_\|_| |_|
             </div>
 
-            <p class="system-msg">WIRED_ALTER_TERM // v0.12</p>
+            <p class="system-msg">WIRED_ALTER_TERM // v0.13</p>
             <p class="system-msg">> IDENTITY VERIFICATION REQUIRED</p>
 
             <form id="pinForm" class="pin-form">
                 <div class="input-wrapper">
                     <span class="prompt">root@gatekeeper:~$ enter_pin: </span>
-                    
-                    <input 
-                        type="password" 
-                        id="realPinInput" 
-                        name="wired_term_pin_ignore" 
-                        maxlength="6" 
-                        autocomplete="off" 
-                        data-lpignore="true" 
-                        autofocus>
-                        
+
+                    <input type="password" id="realPinInput" name="wired_term_pin_ignore" maxlength="6"
+                        autocomplete="off" data-lpignore="true" autofocus>
+
                     <span id="fakeCursor" class="cursor">█</span>
                 </div>
                 <div id="feedbackMsg" class="feedback"></div>
             </form>
-            
+
             <div style="text-align: center; margin-top: 15px;">
-                <button type="button" id="passkeyBtn" style="background: none; border: 1px solid #58a6ff; color: #58a6ff; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-family: monospace;">Login with Passkey</button>
+                <button type="button" id="passkeyBtn"
+                    style="background: none; border: 1px solid #58a6ff; color: #58a6ff; padding: 5px 10px; cursor: pointer; border-radius: 4px; font-family: monospace;">Login
+                    with Passkey</button>
             </div>
         </div>
     </div>
 
     <script src="login.js"></script>
 </body>
+
 </html>
