@@ -67,16 +67,34 @@ db.exec(`
   );
 `);
 
-// --- E2EE CONFIGURATION & PRE-FLIGHT ---
-const E2EE_PASSPHRASE = process.env.E2EE_PASSPHRASE;
-const FORCE_E2EE = process.env.FORCE_E2EE === 'true' || (Boolean(E2EE_PASSPHRASE) && process.env.FORCE_E2EE !== 'false');
+// --- E2EE CONFIGURATION & HELPERS ---
 const E2EE_PBKDF2_ITERATIONS = parseInt(process.env.E2EE_PBKDF2_ITERATIONS, 10) || E2EE_CONSTANTS.PBKDF2_DEFAULT_ITERATIONS;
 
-if (process.env.FORCE_E2EE === 'true' && !IS_TEST) {
+export function isForceE2EE() {
+    if (process.env.FORCE_E2EE === 'true') return true;
+    if (process.env.FORCE_E2EE === 'false') return false;
+    const dbForce = db.prepare("SELECT value FROM settings WHERE key = 'force_e2ee'").get();
+    return dbForce ? dbForce.value === 'true' : false;
+}
+
+export function getEffectiveE2EEPassphrase() {
+    if (!process.env.E2EE_PASSPHRASE) return null;
+    const dbDisable = db.prepare("SELECT value FROM settings WHERE key = 'disable_e2ee_passphrase'").get();
+    if (dbDisable && dbDisable.value === 'true') return null;
+    return process.env.E2EE_PASSPHRASE;
+}
+
+if (!IS_TEST) {
     const passkeyCount = db.prepare('SELECT COUNT(*) as c FROM passkeys').get()?.c || 0;
-    if (!E2EE_PASSPHRASE && passkeyCount === 0) {
-        console.error("❌ FATAL: FORCE_E2EE=true is set, but neither E2EE_PASSPHRASE is configured nor are any passkeys registered in the database.");
-        process.exit(1);
+    const effectivePassphrase = getEffectiveE2EEPassphrase();
+    if (process.env.FORCE_E2EE === 'true') {
+        if (!process.env.E2EE_PASSPHRASE && passkeyCount === 0) {
+            console.error("❌ FATAL: FORCE_E2EE=true is set, but neither E2EE_PASSPHRASE is configured nor are any passkeys registered in the database.");
+            process.exit(1);
+        }
+    } else if (isForceE2EE() && !effectivePassphrase && passkeyCount === 0) {
+        console.warn("⚠️ Resetting database force_e2ee=false because no passkeys or active passphrases exist.");
+        db.prepare("INSERT INTO settings (key, value) VALUES ('force_e2ee', 'false') ON CONFLICT(key) DO UPDATE SET value = 'false'").run();
     }
 }
 
@@ -417,14 +435,54 @@ const csrfCheck = (req, res, next) => {
 // --- SETTINGS ROUTES ---
 app.get('/api/settings', (req, res) => {
     const disablePin = db.prepare("SELECT value FROM settings WHERE key = 'disable_pin'").get();
-    res.json({ disablePin: disablePin ? disablePin.value === 'true' : false, envDisablePin: DISABLE_PIN });
+    const disablePassphrase = db.prepare("SELECT value FROM settings WHERE key = 'disable_e2ee_passphrase'").get();
+    const passkeyCount = db.prepare('SELECT COUNT(*) as c FROM passkeys').get()?.c || 0;
+
+    res.json({
+        disablePin: disablePin ? disablePin.value === 'true' : false,
+        envDisablePin: DISABLE_PIN,
+        forceE2EE: isForceE2EE(),
+        envForceE2EE: process.env.FORCE_E2EE === 'true',
+        hasEnvPassphrase: Boolean(process.env.E2EE_PASSPHRASE),
+        disablePassphrase: disablePassphrase ? disablePassphrase.value === 'true' : false,
+        passkeyCount
+    });
 });
 
 app.post('/api/settings', csrfCheck, (req, res) => {
-    const { disablePin } = req.body;
+    const { disablePin, forceE2EE, disablePassphrase } = req.body;
+    const passkeyCount = db.prepare('SELECT COUNT(*) as c FROM passkeys').get()?.c || 0;
+
     if (typeof disablePin !== 'undefined') {
+        if (disablePin && passkeyCount === 0) {
+            return res.status(400).json({ error: "Cannot disable PIN login: no passkeys are registered. Register a passkey first." });
+        }
         db.prepare("INSERT INTO settings (key, value) VALUES ('disable_pin', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(disablePin ? 'true' : 'false');
     }
+
+    if (typeof forceE2EE !== 'undefined') {
+        if (process.env.FORCE_E2EE === 'true') {
+            return res.status(400).json({ error: "Strict E2EE is locked by environment variable (FORCE_E2EE=true)." });
+        }
+        if (forceE2EE) {
+            const effectivePassphrase = getEffectiveE2EEPassphrase();
+            if (passkeyCount === 0 && !effectivePassphrase) {
+                return res.status(400).json({ error: "Cannot enforce E2EE: no passkeys are registered and no active passphrase exists." });
+            }
+        }
+        db.prepare("INSERT INTO settings (key, value) VALUES ('force_e2ee', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(forceE2EE ? 'true' : 'false');
+    }
+
+    if (typeof disablePassphrase !== 'undefined') {
+        if (!process.env.E2EE_PASSPHRASE) {
+            return res.status(400).json({ error: "No E2EE passphrase configured in environment." });
+        }
+        if (disablePassphrase && isForceE2EE() && passkeyCount === 0) {
+            return res.status(400).json({ error: "Cannot disable passphrase: Strict E2EE is enabled and no passkeys are registered." });
+        }
+        db.prepare("INSERT INTO settings (key, value) VALUES ('disable_e2ee_passphrase', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(disablePassphrase ? 'true' : 'false');
+    }
+
     res.json({ success: true });
 });
 
@@ -568,17 +626,19 @@ io.on('connection', (socket) => {
         return;
     }
 
+    const effectivePassphrase = getEffectiveE2EEPassphrase();
+    const effectiveForceE2EE = isForceE2EE();
     const e2ee = new ServerE2EESession(E2EE_PBKDF2_ITERATIONS);
     const passkeyRows = db.prepare('SELECT COUNT(*) as c FROM passkeys').get();
     const hasPasskeys = (passkeyRows?.c || 0) > 0;
     const availableModes = {
         passkey: hasPasskeys,
-        passphrase: Boolean(E2EE_PASSPHRASE)
+        passphrase: Boolean(effectivePassphrase)
     };
 
     // Emit initial status so client knows if E2EE is required, available, and iterations
     socket.emit('e2ee:status', {
-        forceE2EE: FORCE_E2EE,
+        forceE2EE: effectiveForceE2EE,
         availableModes,
         iterations: E2EE_PBKDF2_ITERATIONS
     });
@@ -623,7 +683,7 @@ io.on('connection', (socket) => {
     };
 
     // Delay PTY spawning in Strict Mode until e2ee:verify succeeds!
-    if (!FORCE_E2EE) {
+    if (!effectiveForceE2EE) {
         startPtyProcess();
     }
 
@@ -648,8 +708,9 @@ io.on('connection', (socket) => {
                 socket.emit('e2ee:error', err.message);
             }
         } else {
-            if (!E2EE_PASSPHRASE) {
-                socket.emit('e2ee:error', 'Server has no E2EE_PASSPHRASE configured');
+            const currentPassphrase = getEffectiveE2EEPassphrase();
+            if (!currentPassphrase) {
+                socket.emit('e2ee:error', 'Server has no active E2EE passphrase configured');
                 return;
             }
             const challengePayload = e2ee.initChallenge('passphrase');
@@ -713,9 +774,15 @@ io.on('connection', (socket) => {
                     return;
                 }
             } else {
+                const currentPassphrase = getEffectiveE2EEPassphrase();
+                if (!currentPassphrase) {
+                    socket.emit('e2ee:error', 'Passphrase E2EE is disabled on this server');
+                    setTimeout(() => socket.disconnect(true), 500);
+                    return;
+                }
                 const encryptedProof = data.encryptedProof || data;
                 const ok = await e2ee.verifyPassphraseHandshake(
-                    E2EE_PASSPHRASE,
+                    currentPassphrase,
                     toBuffer(encryptedProof)
                 );
                 if (!ok) {
@@ -777,12 +844,12 @@ io.on('connection', (socket) => {
 
     // Plaintext input (only allowed if NOT enforced and NOT verified)
     socket.on('terminal:input', (data) => {
-        if (FORCE_E2EE || e2ee.isVerified) return;
+        if (isForceE2EE() || e2ee.isVerified) return;
         if (typeof data !== 'string' || !ptyProcess) return;
         try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
     });
     socket.on('terminal:resize', ({ cols, rows }) => {
-        if (FORCE_E2EE || e2ee.isVerified) return;
+        if (isForceE2EE() || e2ee.isVerified) return;
         if (!ptyProcess) return;
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));

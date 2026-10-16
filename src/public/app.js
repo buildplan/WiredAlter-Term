@@ -156,7 +156,10 @@ if (e2eeBtn) {
         const activeTab = window.tabManager?.getActiveTab();
         if (!activeTab) return;
         if (activeTab.e2ee && activeTab.e2ee.isReady) {
-            const msg = 'This terminal tab is end-to-end encrypted (E2EE Active 🔒).\n\nKeystrokes, passwords, and screen buffers are shielded from proxy inspection.';
+            const cipherInfo = activeTab.e2ee.mode === 'passkey'
+                ? 'Passkey (P-256 ECDH + HKDF-SHA256 + AES-GCM-256)'
+                : 'Passphrase (PBKDF2-HMAC-SHA256 + AES-GCM-256)';
+            const msg = `This terminal tab is end-to-end encrypted (E2EE Active 🔒).\n\nCipher: ${cipherInfo}\n\nKeystrokes, passwords, and screen buffers are shielded from TLS proxy inspection.`;
             if (typeof window.showCustomAlert === 'function') {
                 await window.showCustomAlert(msg, 'E2EE Status');
             } else {
@@ -480,6 +483,9 @@ class TerminalTab {
 
         this.socket.on('e2ee:ready', (data) => {
             this.e2ee.markReady();
+            if (this.tabElement) {
+                this.tabElement.classList.add('tab-encrypted');
+            }
             if (this.isActive()) {
                 updateE2EEUI(true);
             }
@@ -627,6 +633,9 @@ class TerminalTab {
     activate() {
         this.element.classList.add('active');
         this.tabElement.classList.add('active');
+        if (this.tabElement) {
+            this.tabElement.classList.toggle('tab-encrypted', Boolean(this.e2ee && this.e2ee.isReady));
+        }
         this.term.focus();
         this.resize();
         this.syncStatus();
@@ -1443,39 +1452,155 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2b. Security Settings
+    // 2b. Security Settings Modal
     const securityBtn = document.getElementById('security-settings-btn');
+    const securityModal = document.getElementById('security-modal');
+    const secCloseBtn = document.getElementById('security-modal-close');
+    const secCloseX = document.getElementById('security-modal-close-x');
+    const secFeedback = document.getElementById('security-feedback-msg');
+
+    const secForceStatus = document.getElementById('sec-force-e2ee-status');
+    const secForceToggle = document.getElementById('sec-force-e2ee-toggle');
+
+    const secPassStatus = document.getElementById('sec-passphrase-status');
+    const secPassToggle = document.getElementById('sec-passphrase-toggle');
+
+    const secPinStatus = document.getElementById('sec-pin-status');
+    const secPinToggle = document.getElementById('sec-pin-toggle');
+
+    let currentSettings = null;
+
+    async function refreshSecurityModal() {
+        if (!securityModal) return;
+        if (secFeedback) secFeedback.textContent = '';
+        try {
+            const resp = await fetch('/api/settings');
+            if (!resp.ok) throw new Error('Failed to load settings');
+            currentSettings = await resp.json();
+
+            // 1. Strict E2EE
+            if (secForceStatus && secForceToggle) {
+                if (currentSettings.envForceE2EE) {
+                    secForceStatus.textContent = 'LOCKED (ENV)';
+                    secForceStatus.className = 'badge badge-locked';
+                    secForceToggle.disabled = true;
+                    secForceToggle.textContent = 'Locked';
+                } else if (currentSettings.forceE2EE) {
+                    secForceStatus.textContent = 'ENABLED';
+                    secForceStatus.className = 'badge badge-enabled';
+                    secForceToggle.disabled = false;
+                    secForceToggle.textContent = 'Disable';
+                } else {
+                    secForceStatus.textContent = 'DISABLED';
+                    secForceStatus.className = 'badge badge-disabled';
+                    secForceToggle.disabled = false;
+                    secForceToggle.textContent = 'Enable';
+                }
+            }
+
+            // 2. Passphrase Fallback
+            if (secPassStatus && secPassToggle) {
+                if (!currentSettings.hasEnvPassphrase) {
+                    secPassStatus.textContent = 'NOT CONFIGURED';
+                    secPassStatus.className = 'badge badge-disabled';
+                    secPassToggle.disabled = true;
+                    secPassToggle.textContent = 'N/A';
+                } else if (currentSettings.disablePassphrase) {
+                    secPassStatus.textContent = 'DISABLED';
+                    secPassStatus.className = 'badge badge-disabled';
+                    secPassToggle.disabled = false;
+                    secPassToggle.textContent = 'Enable';
+                } else {
+                    secPassStatus.textContent = 'ENABLED';
+                    secPassStatus.className = 'badge badge-enabled';
+                    secPassToggle.disabled = false;
+                    secPassToggle.textContent = 'Disable';
+                }
+            }
+
+            // 3. PIN Login
+            if (secPinStatus && secPinToggle) {
+                if (currentSettings.envDisablePin) {
+                    secPinStatus.textContent = 'DISABLED (ENV)';
+                    secPinStatus.className = 'badge badge-locked';
+                    secPinToggle.disabled = true;
+                    secPinToggle.textContent = 'Locked';
+                } else if (currentSettings.disablePin) {
+                    secPinStatus.textContent = 'DISABLED';
+                    secPinStatus.className = 'badge badge-disabled';
+                    secPinToggle.disabled = false;
+                    secPinToggle.textContent = 'Enable';
+                } else {
+                    secPinStatus.textContent = 'ENABLED';
+                    secPinStatus.className = 'badge badge-enabled';
+                    secPinToggle.disabled = false;
+                    secPinToggle.textContent = 'Disable';
+                }
+            }
+        } catch (e) {
+            if (secFeedback) secFeedback.textContent = e.message;
+        }
+    }
+
+    async function updateSetting(payload) {
+        if (secFeedback) secFeedback.textContent = '';
+        try {
+            const csrfRes = await fetch('/api/csrf-token');
+            const { token } = await csrfRes.json();
+            const resp = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': token
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.error || 'Failed to update setting');
+            }
+            await refreshSecurityModal();
+        } catch (err) {
+            if (secFeedback) secFeedback.textContent = err.message;
+        }
+    }
+
+    if (secForceToggle) {
+        secForceToggle.addEventListener('click', () => {
+            if (!currentSettings || currentSettings.envForceE2EE) return;
+            updateSetting({ forceE2EE: !currentSettings.forceE2EE });
+        });
+    }
+
+    if (secPassToggle) {
+        secPassToggle.addEventListener('click', () => {
+            if (!currentSettings || !currentSettings.hasEnvPassphrase) return;
+            updateSetting({ disablePassphrase: !currentSettings.disablePassphrase });
+        });
+    }
+
+    if (secPinToggle) {
+        secPinToggle.addEventListener('click', () => {
+            if (!currentSettings || currentSettings.envDisablePin) return;
+            updateSetting({ disablePin: !currentSettings.disablePin });
+        });
+    }
+
+    const closeSecurityModal = () => {
+        if (securityModal && typeof securityModal.close === 'function') {
+            securityModal.close();
+        }
+    };
+    if (secCloseBtn) secCloseBtn.addEventListener('click', closeSecurityModal);
+    if (secCloseX) secCloseX.addEventListener('click', closeSecurityModal);
+
     if (securityBtn) {
         securityBtn.addEventListener('click', async () => {
-            try {
-                const resp = await fetch('/api/settings');
-                const settings = await resp.json();
-
-                if (settings.envDisablePin) {
-                    await showCustomAlert('PIN login is completely disabled via environment variable (DISABLE_PIN=true).', 'Security Settings');
-                    return;
-                }
-
-                const currentStatus = settings.disablePin ? 'DISABLED' : 'ENABLED';
-                const actionText = settings.disablePin ? 'Enable' : 'Disable';
-
-                const confirmChange = await showCustomConfirm(`PIN login is currently ${currentStatus}.\n\nDo you want to ${actionText} PIN login?`, 'Security Settings');
-                if (confirmChange) {
-                    const newStatus = !settings.disablePin;
-                    const csrfRes = await fetch('/api/csrf-token');
-                    const { token } = await csrfRes.json();
-                    await fetch('/api/settings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-csrf-token': token
-                        },
-                        body: JSON.stringify({ disablePin: newStatus })
-                    });
-                    await showCustomAlert(`PIN login is now ${newStatus ? 'DISABLED' : 'ENABLED'}.`, 'Settings Updated');
-                }
-            } catch (e) {
-                await showCustomAlert(e.message, 'Error');
+            const settingsDropdown = document.getElementById('settings-dropdown');
+            if (settingsDropdown) settingsDropdown.classList.remove('show');
+            await refreshSecurityModal();
+            if (securityModal && typeof securityModal.showModal === 'function') {
+                securityModal.showModal();
             }
         });
     }
