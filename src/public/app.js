@@ -571,6 +571,8 @@ class TerminalTab {
             // On fresh connection, re-instantiate client E2EE session for fresh keys
             this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
             this.syncStatus();
+            this._lastCols = null;
+            this._lastRows = null;
             if (this.isActive()) {
                 this.term.focus();
                 this.startLatencyCheck();

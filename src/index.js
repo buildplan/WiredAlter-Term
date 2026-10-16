@@ -620,10 +620,6 @@ const setupPersistence = () => {
         try {
             let sc = fs.readFileSync(starshipPath, 'utf8');
             let mod = false;
-            if (sc.includes('add_newline = true')) {
-                sc = sc.replace('add_newline = true', 'add_newline = false');
-                mod = true;
-            }
             if (sc.includes('[docker_context]') && !sc.includes('disabled = true')) {
                 sc = sc.replace('[docker_context]', '[docker_context]\ndisabled = true');
                 mod = true;
@@ -633,7 +629,7 @@ const setupPersistence = () => {
             }
             if (mod) {
                 fs.writeFileSync(starshipPath, sc, 'utf8');
-                console.log('   🛠️  Migrated persistent starship.toml (compact prompt, disabled docker_context)');
+                console.log('   🛠️  Migrated persistent starship.toml (disabled docker_context)');
             }
         } catch (e) {
             console.warn('   ⚠️  Could not migrate starship.toml:', e.message);
