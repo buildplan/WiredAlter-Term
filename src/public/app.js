@@ -333,7 +333,7 @@ class TerminalTab {
         this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
         this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        
+
         try {
             this.fitAddon.fit();
         } catch (e) {
@@ -342,13 +342,17 @@ class TerminalTab {
 
         this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
         this._pendingPassphrase = null;
+        this.wasEncrypted = false;
+        this.isProcessExited = false;
 
         this.socket = io({
             forceNew: true,
             multiplex: false,
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000,
             query: {
                 cols: this.term.cols || 80,
                 rows: this.term.rows || 30,
@@ -371,6 +375,16 @@ class TerminalTab {
         }
 
         this.term.onData((data) => {
+            if (this.isProcessExited) {
+                if (data.includes('\r') || data.includes('\n')) {
+                    this.isProcessExited = false;
+                    this.term.write('\r\n\x1b[36m⚡ Restarting session...\x1b[0m\r\n');
+                    if (this.socket) {
+                        this.socket.connect();
+                    }
+                }
+                return;
+            }
             if (this.e2ee && this.e2ee.isReady) {
                 this.e2ee.enqueueEncryptInput(data, (wireBuf) => {
                     this.socket.emit('terminal:input:enc', wireBuf);
@@ -427,9 +441,9 @@ class TerminalTab {
         this.socket.on('e2ee:status', (status) => {
             serverE2EEStatus = status;
             if (this.isActive()) {
-                updateE2EEUI(this.e2ee.isReady);
+                updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
-            if (status.forceE2EE && !this.e2ee.isReady) {
+            if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
                 this.initiateE2EE(status);
             }
         });
@@ -483,6 +497,7 @@ class TerminalTab {
 
         this.socket.on('e2ee:ready', (data) => {
             this.e2ee.markReady();
+            this.wasEncrypted = true;
             if (this.tabElement) {
                 this.tabElement.classList.add('tab-encrypted');
             }
@@ -504,17 +519,37 @@ class TerminalTab {
             }
         });
 
+        this.socket.on('terminal:exit', ({ code }) => {
+            this.isProcessExited = true;
+            this.term.write(`\r\n\x1b[33m[Process exited (code ${code}). Press Enter to restart]\x1b[0m\r\n`);
+        });
+
         this.socket.on('connect', () => {
+            this.isProcessExited = false;
+            // On fresh connection, re-instantiate client E2EE session for fresh keys
+            this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+            this.syncStatus();
             if (this.isActive()) {
-                this.syncStatus();
                 this.startLatencyCheck();
-                this.resize();
+                setTimeout(() => this.resize(), 100);
             }
         });
 
-        this.socket.on('disconnect', () => {
+        this.socket.on('disconnect', (reason) => {
             if (this.isActive()) this.updateStatus('disconnected');
             clearInterval(this.pingInterval);
+
+            // If disconnected by server, transport, or ping timeout, attempt reconnect
+            if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'ping timeout') {
+                if (!this.isProcessExited) {
+                    setTimeout(() => {
+                        if (this.socket && !this.socket.connected) {
+                            if (this.isActive()) this.updateStatus('connecting');
+                            this.socket.connect();
+                        }
+                    }, 1000);
+                }
+            }
         });
 
         this.socket.on('connect_error', () => {
@@ -640,15 +675,19 @@ class TerminalTab {
         this.resize();
         this.syncStatus();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
+        if (this.socket && !this.socket.connected && !this.isProcessExited) {
+            this.socket.connect();
+        }
         setTimeout(() => {
             if (this.isActive()) this.syncStatus();
         }, 100);
     }
 
     syncStatus() {
-        if (this.socket.connected) {
+        if (!this.isActive()) return;
+        if (this.socket && this.socket.connected) {
             this.updateStatus('connected');
-        } else if (this.socket.io.engine.readyState === 'opening') {
+        } else if (this.socket && this.socket.io && this.socket.io.engine && this.socket.io.engine.readyState === 'opening') {
             this.updateStatus('connecting');
         } else {
             this.updateStatus('disconnected');
@@ -683,6 +722,7 @@ class TerminalTab {
     }
 
     updateStatus(state) {
+        if (!this.isActive()) return;
         if (state === 'connected') {
             statusElem.innerHTML = '<span class="status-icon">🟢</span> <span class="status-text">Connected</span>';
             statusElem.style.color = '#7ee787';
@@ -713,6 +753,7 @@ class TerminalTab {
         if (this.resizeObserver) { this.resizeObserver.disconnect(); }
         try {
             if (this.socket) {
+                this.socket.emit('terminal:close');
                 this.socket.disconnect();
             }
         } catch (e) {
@@ -1605,10 +1646,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Telemetry
-    const telemetrySocket = io();
+    // 3. Telemetry (isolated socket, does not spawn a PTY)
+    const telemetrySocket = io({ query: { type: 'telemetry' } });
     setInterval(() => {
-        telemetrySocket.emit('telemetry:request');
+        if (telemetrySocket.connected) {
+            telemetrySocket.emit('telemetry:request');
+        }
     }, 3000);
     telemetrySocket.on('telemetry:update', (data) => {
         const display = document.getElementById('telemetry-display');
@@ -1616,5 +1659,21 @@ document.addEventListener('DOMContentLoaded', () => {
             display.textContent = `~ CPU: ${data.cpu} | RAM: ${data.mem}% of ${data.totalMem}GB`;
         }
     });
-    setTimeout(() => telemetrySocket.emit('telemetry:request'), 1000);
+    setTimeout(() => {
+        if (telemetrySocket.connected) telemetrySocket.emit('telemetry:request');
+    }, 1000);
+
+    // 4. Window Visibility & Reconnection Handler
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && window.tabManager) {
+            const activeTab = window.tabManager.getActiveTab();
+            if (activeTab) {
+                activeTab.syncStatus();
+                if (activeTab.socket && !activeTab.socket.connected && !activeTab.isProcessExited) {
+                    activeTab.socket.connect();
+                }
+                activeTab.resize();
+            }
+        }
+    });
 });

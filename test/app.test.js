@@ -1,7 +1,7 @@
 import { test, describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import supertest from 'supertest';
-import { app, isForceE2EE, getEffectiveE2EEPassphrase } from '../src/index.js';
+import { app, isForceE2EE, getEffectiveE2EEPassphrase, activeTabSessions, DISCONNECT_GRACE_MS } from '../src/index.js';
 
 describe('WiredAlter-Term Full Suite', () => {
     const agent = supertest.agent(app);
@@ -123,6 +123,11 @@ describe('WiredAlter-Term Full Suite', () => {
         // In test mode without FORCE_E2EE or E2EE_PASSPHRASE env vars
         assert.strictEqual(typeof isForceE2EE(), 'boolean');
         assert.strictEqual(getEffectiveE2EEPassphrase(), null);
+    });
+
+    it('activeTabSessions map and DISCONNECT_GRACE_MS should be configured for resilience', () => {
+        assert.ok(activeTabSessions instanceof Map, 'activeTabSessions should be a Map');
+        assert.strictEqual(DISCONNECT_GRACE_MS, 60000, 'DISCONNECT_GRACE_MS should be 60 seconds');
     });
 });
 

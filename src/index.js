@@ -23,7 +23,11 @@ const PUBLIC_DIR = join(__dirname, 'public');
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
+const io = new Server(httpServer, {
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    maxHttpBufferSize: 50 * 1024 * 1024
+});
 
 const PORT = process.env.PORT || 3939;
 const PIN = process.env.PIN || "123456";
@@ -618,6 +622,9 @@ const setupPersistence = () => {
 setupPersistence();
 
 // --- 6. TERMINAL LOGIC ---
+const activeTabSessions = new Map();
+const DISCONNECT_GRACE_MS = 60000; // 60 seconds grace period for transient network drops
+
 io.on('connection', (socket) => {
     const req = socket.request;
     if (!req.session || !req.session.authenticated) {
@@ -626,6 +633,22 @@ io.on('connection', (socket) => {
         return;
     }
 
+    // Telemetry handler socket (isolated from PTY)
+    if (socket.handshake.query.type === 'telemetry' || !socket.handshake.query.tabId) {
+        socket.on('telemetry:request', () => {
+            const freeMem = os.freemem();
+            const totalMem = os.totalmem();
+            const loadAvg = os.loadavg();
+            socket.emit('telemetry:update', {
+                cpu: (loadAvg[0]).toFixed(2), // 1 min load avg
+                mem: (((totalMem - freeMem) / totalMem) * 100).toFixed(1),
+                totalMem: (totalMem / 1024 / 1024 / 1024).toFixed(1)
+            });
+        });
+        return;
+    }
+
+    const tabId = String(socket.handshake.query.tabId);
     const effectivePassphrase = getEffectiveE2EEPassphrase();
     const effectiveForceE2EE = isForceE2EE();
     const e2ee = new ServerE2EESession(E2EE_PBKDF2_ITERATIONS);
@@ -643,49 +666,107 @@ io.on('connection', (socket) => {
         iterations: E2EE_PBKDF2_ITERATIONS
     });
 
-    const tabId = socket.handshake.query.tabId || 'main';
     const cleanEnv = { ...process.env, TERM: 'xterm-256color', WIRED_TAB_ID: tabId };
     delete cleanEnv.TMUX;
     delete cleanEnv.TMUX_PANE;
-    
+
     const initCols = parseInt(socket.handshake.query.cols, 10) || 80;
     const initRows = parseInt(socket.handshake.query.rows, 10) || 30;
 
-    let ptyProcess = null;
+    let sessionObj = activeTabSessions.get(tabId);
+
+    const bindPtyOutput = (proc, sock, cipherSession) => {
+        if (proc._wiredDataDisposable) {
+            proc._wiredDataDisposable.dispose();
+            proc._wiredDataDisposable = null;
+        }
+        proc._wiredDataDisposable = proc.onData((data) => {
+            if (cipherSession.isVerified) {
+                try {
+                    const enc = cipherSession.encryptOutput(data);
+                    sock.emit('terminal:output:enc', enc);
+                } catch (err) {
+                    console.error(`[Tab ${tabId}] Encryption output failed:`, err.message);
+                }
+            } else {
+                sock.emit('terminal:output', data);
+            }
+        });
+    };
 
     const startPtyProcess = () => {
-        if (ptyProcess) return;
-        ptyProcess = pty.spawn('bash', [], {
+        if (sessionObj?.ptyProcess) return;
+        const ptyProcess = pty.spawn('bash', [], {
             name: 'xterm-256color',
             cols: initCols,
             rows: initRows,
             cwd: process.env.HOME,
             env: cleanEnv
         });
+        sessionObj.ptyProcess = ptyProcess;
 
-        if (e2ee.isVerified) {
-            ptyProcess.onData((data) => {
-                try {
-                    const enc = e2ee.encryptOutput(data);
-                    socket.emit('terminal:output:enc', enc);
-                } catch (err) {
-                    console.error("Encryption output failed:", err.message);
-                }
-            });
-        } else {
-            ptyProcess.onData((data) => socket.emit('terminal:output', data));
-        }
+        bindPtyOutput(ptyProcess, socket, e2ee);
 
         ptyProcess.on('exit', (code, signal) => {
-            console.log(`PTY exited with code ${code}. Closing socket.`);
-            socket.disconnect();
+            console.log(`[Tab ${tabId}] PTY exited with code ${code}.`);
+            if (sessionObj.disconnectTimer) {
+                clearTimeout(sessionObj.disconnectTimer);
+                sessionObj.disconnectTimer = null;
+            }
+            activeTabSessions.delete(tabId);
+            try {
+                sessionObj.socket?.emit('terminal:exit', { code, signal });
+            } catch (e) { }
+            setTimeout(() => {
+                try { sessionObj.socket?.disconnect(true); } catch (e) { }
+            }, 100);
         });
     };
 
-    // Delay PTY spawning in Strict Mode until e2ee:verify succeeds!
-    if (!effectiveForceE2EE) {
-        startPtyProcess();
+    if (sessionObj && sessionObj.ptyProcess) {
+        // Reconnection within grace period
+        if (sessionObj.disconnectTimer) {
+            clearTimeout(sessionObj.disconnectTimer);
+            sessionObj.disconnectTimer = null;
+            console.log(`[Tab ${tabId}] Reconnected within grace period. Re-attaching PTY.`);
+        }
+        if (sessionObj.socket && sessionObj.socket !== socket) {
+            try { sessionObj.socket.disconnect(true); } catch (e) { }
+        }
+        sessionObj.socket = socket;
+        sessionObj.e2ee = e2ee;
+
+        // If not in strict E2EE, re-bind output and trigger resize
+        if (!effectiveForceE2EE) {
+            bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
+            try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
+        }
+    } else {
+        sessionObj = {
+            tabId,
+            ptyProcess: null,
+            e2ee,
+            socket,
+            disconnectTimer: null
+        };
+        activeTabSessions.set(tabId, sessionObj);
+
+        // Delay PTY spawning in Strict Mode until e2ee:verify succeeds!
+        if (!effectiveForceE2EE) {
+            startPtyProcess();
+        }
     }
+
+    const touchSession = () => {
+        if (req.session) {
+            const now = Date.now();
+            if (!socket.lastSessionSave || now - socket.lastSessionSave > 60 * 1000) {
+                req.session.touch();
+                req.session.save();
+                socket.lastSessionSave = now;
+            }
+        }
+    };
 
     // --- E2EE Handshake Handlers ---
     socket.on('e2ee:init', async (data) => {
@@ -792,25 +873,19 @@ io.on('connection', (socket) => {
                 }
             }
 
+            sessionObj.e2ee = e2ee;
             socket.emit('e2ee:ready', { mode: e2ee.mode });
 
             // If PTY not yet spawned (Strict Mode), spawn it now!
-            if (!ptyProcess) {
+            if (!sessionObj.ptyProcess) {
                 startPtyProcess();
             } else {
-                // In optional mode, transition existing PTY to encrypted output listener
-                ptyProcess.removeAllListeners('data');
-                ptyProcess.onData((ptyData) => {
-                    try {
-                        const enc = e2ee.encryptOutput(ptyData);
-                        socket.emit('terminal:output:enc', enc);
-                    } catch (err) {
-                        console.error("Encryption output failed:", err.message);
-                    }
-                });
+                // Transition existing PTY to encrypted output listener
+                bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
+                try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
             }
         } catch (err) {
-            console.error("E2EE verification error:", err);
+            console.error(`[Tab ${tabId}] E2EE verification error:`, err);
             socket.emit('e2ee:error', err.message || 'Verification error');
             setTimeout(() => socket.disconnect(true), 500);
         }
@@ -818,75 +893,96 @@ io.on('connection', (socket) => {
 
     // Encrypted terminal handlers
     socket.on('terminal:input:enc', (wireBuffer) => {
-        if (!e2ee.isVerified || !ptyProcess) return;
+        const proc = sessionObj?.ptyProcess;
+        if (!e2ee.isVerified || !proc) return;
         try {
             const plaintextBuf = e2ee.decryptInput(wireBuffer);
-            ptyProcess.write(plaintextBuf.toString('utf8'));
+            proc.write(plaintextBuf.toString('utf8'));
+            touchSession();
         } catch (err) {
-            console.error("Failed to decrypt terminal input:", err.message);
+            console.error(`[Tab ${tabId}] Failed to decrypt terminal input:`, err.message);
             socket.disconnect(true);
         }
     });
 
     socket.on('terminal:resize:enc', (wireBuffer) => {
-        if (!e2ee.isVerified || !ptyProcess) return;
+        const proc = sessionObj?.ptyProcess;
+        if (!e2ee.isVerified || !proc) return;
         try {
             const plaintextBuf = e2ee.decryptInput(wireBuffer);
             const { cols, rows } = JSON.parse(plaintextBuf.toString('utf8'));
             const safeCols = Math.max(1, Math.min(1000, cols || 80));
             const safeRows = Math.max(1, Math.min(1000, rows || 30));
-            ptyProcess.resize(safeCols, safeRows);
+            proc.resize(safeCols, safeRows);
         } catch (err) {
-            console.error("Failed to decrypt terminal resize:", err.message);
+            console.error(`[Tab ${tabId}] Failed to decrypt terminal resize:`, err.message);
             socket.disconnect(true);
         }
     });
 
     // Plaintext input (only allowed if NOT enforced and NOT verified)
     socket.on('terminal:input', (data) => {
+        const proc = sessionObj?.ptyProcess;
         if (isForceE2EE() || e2ee.isVerified) return;
-        if (typeof data !== 'string' || !ptyProcess) return;
-        try { ptyProcess.write(data); } catch (err) { console.error("Failed to write to terminal:", err.message); }
-    });
-    socket.on('terminal:resize', ({ cols, rows }) => {
-        if (isForceE2EE() || e2ee.isVerified) return;
-        if (!ptyProcess) return;
-        const safeCols = Math.max(1, Math.min(1000, cols || 80));
-        const safeRows = Math.max(1, Math.min(1000, rows || 30));
-        try { ptyProcess.resize(safeCols, safeRows); }
-        catch (err) { console.warn('Resize failed:', err.message); }
-    });
-
-    socket.on('disconnect', () => {
-        if (ptyProcess) ptyProcess.kill();
-    });
-    socket.on('latency:ping', (timestamp) => {
-        socket.emit('latency:pong', timestamp);
-        if (req.session) {
-            const now = Date.now();
-            if (!socket.lastSessionSave || now - socket.lastSessionSave > 5 * 60 * 1000) {
-                req.session.touch();
-                req.session.save();
-                socket.lastSessionSave = now;
-            }
+        if (typeof data !== 'string' || !proc) return;
+        try {
+            proc.write(data);
+            touchSession();
+        } catch (err) {
+            console.error(`[Tab ${tabId}] Failed to write to terminal:`, err.message);
         }
     });
 
-    // Telemetry handler
-    socket.on('telemetry:request', () => {
-        const freeMem = os.freemem();
-        const totalMem = os.totalmem();
-        const loadAvg = os.loadavg();
-        socket.emit('telemetry:update', {
-            cpu: (loadAvg[0]).toFixed(2), // 1 min load avg
-            mem: (((totalMem - freeMem) / totalMem) * 100).toFixed(1),
-            totalMem: (totalMem / 1024 / 1024 / 1024).toFixed(1)
-        });
+    socket.on('terminal:resize', ({ cols, rows }) => {
+        const proc = sessionObj?.ptyProcess;
+        if (isForceE2EE() || e2ee.isVerified) return;
+        if (!proc) return;
+        const safeCols = Math.max(1, Math.min(1000, cols || 80));
+        const safeRows = Math.max(1, Math.min(1000, rows || 30));
+        try { proc.resize(safeCols, safeRows); }
+        catch (err) { console.warn(`[Tab ${tabId}] Resize failed:`, err.message); }
+    });
+
+    // Explicit tab close from frontend
+    socket.on('terminal:close', () => {
+        console.log(`[Tab ${tabId}] Tab closed explicitly by user.`);
+        if (sessionObj) {
+            if (sessionObj.disconnectTimer) {
+                clearTimeout(sessionObj.disconnectTimer);
+                sessionObj.disconnectTimer = null;
+            }
+            if (sessionObj.ptyProcess) {
+                sessionObj.ptyProcess.kill();
+            }
+            activeTabSessions.delete(tabId);
+        }
+    });
+
+    socket.on('disconnect', (reason) => {
+        if (!sessionObj || !sessionObj.ptyProcess) return;
+
+        // Only start grace period if this socket was the active socket for the session
+        if (sessionObj.socket === socket) {
+            console.log(`[Tab ${tabId}] Disconnected (${reason}). Holding session for ${DISCONNECT_GRACE_MS / 1000}s grace period...`);
+            if (sessionObj.disconnectTimer) clearTimeout(sessionObj.disconnectTimer);
+            sessionObj.disconnectTimer = setTimeout(() => {
+                console.log(`[Tab ${tabId}] Grace period expired. Terminating PTY process.`);
+                if (sessionObj.ptyProcess) {
+                    sessionObj.ptyProcess.kill();
+                }
+                activeTabSessions.delete(tabId);
+            }, DISCONNECT_GRACE_MS);
+        }
+    });
+
+    socket.on('latency:ping', (timestamp) => {
+        socket.emit('latency:pong', timestamp);
+        touchSession();
     });
 });
 
 // --- EXPORT FOR TESTING ---
-export { app, httpServer };
+export { app, httpServer, activeTabSessions, DISCONNECT_GRACE_MS };
 
 // --- START SERVER ---
 if (!IS_TEST) {
