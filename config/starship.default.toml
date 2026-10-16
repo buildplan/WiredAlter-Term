@@ -83,6 +83,7 @@ style = "fg:#7aa2f7 bg:#1f2335"
 format = "[ $symbol ($version) ]($style)"
 
 [docker_context]
+disabled = true
 symbol = " "
 style = "fg:#7aa2f7 bg:#1f2335"
 format = "[ $symbol $context ]($style)"

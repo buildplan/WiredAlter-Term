@@ -32,12 +32,14 @@ WiredAlter-Term includes application-layer **End-to-End Encryption (E2EE)** oper
 1. **Passkey Unlock (Zero Typing):** Uses your phone (Face ID / Touch ID / QR cross-device) or hardware security key (YubiKey) via ephemeral P-256 ECDH bound into the WebAuthn signature. **No characters are typed on the corporate keyboard**, protecting against OS-level keyloggers.
 2. **Passphrase Fallback:** Derives a 256-bit key on both sides using asynchronous `PBKDF2-HMAC-SHA256` with a per-session random salt (the secret is never transmitted over the wire).
 
-### Configuration (`compose.yml`)
+### Configuration
+
+Configure via `compose.yml` or dynamically in **Settings → Security Settings** (stored in SQLite `/data/sessions.db` to survive container recreation):
 
 ```yaml
 environment:
-  - FORCE_E2EE=true           # Strictly enforces E2EE (rejects plaintext connections)
-  - E2EE_PASSPHRASE=mysecret  # Pre-shared passphrase for Mode B fallback
+  - FORCE_E2EE=true           # Strictly enforces E2EE globally (can also be toggled in Security Settings)
+  - E2EE_PASSPHRASE=mysecret  # Pre-shared passphrase for Mode B fallback (can also be toggled off in Security Settings)
   - E2EE_PBKDF2_ITERATIONS=100000 # PBKDF2 iterations (default: 100,000)
 ```
 
