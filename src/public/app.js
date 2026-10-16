@@ -75,6 +75,9 @@ function promptE2EE(status = serverE2EEStatus) {
             return resolve({ mode: 'passphrase', passphrase: cachedSessionPassphrase });
         }
 
+        const container = document.getElementById('terminals-container');
+        if (container) container.classList.add('e2ee-shielded');
+
         pendingE2EEResolve = resolve;
         pendingE2EEReject = reject;
 
@@ -107,6 +110,9 @@ if (e2eePasskeyBtn) {
     e2eePasskeyBtn.addEventListener('click', () => {
         if (pendingE2EEResolve) {
             if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
+            // Keep terminals container shielded while browser/OS passkey prompt is shown!
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.add('e2ee-shielded');
             const res = pendingE2EEResolve;
             pendingE2EEResolve = null;
             pendingE2EEReject = null;
@@ -143,6 +149,12 @@ if (e2eePassphraseInput) {
 if (e2eeModalCancel) {
     e2eeModalCancel.addEventListener('click', () => {
         if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
+        const activeTab = window.tabManager?.getActiveTab();
+        if (!activeTab?.wasEncrypted && !serverE2EEStatus?.forceE2EE) {
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.remove('e2ee-shielded');
+            if (activeTab?.element) activeTab.element.classList.remove('e2ee-shielded');
+        }
         if (pendingE2EEReject) {
             const rej = pendingE2EEReject;
             pendingE2EEResolve = null;
@@ -255,12 +267,13 @@ async function waitForFonts() {
 
 // --- TERMINAL TAB CLASS ---
 class TerminalTab {
-    constructor(id, manager, name = null, savedContent = '') {
+    constructor(id, manager, name = null, savedContent = '', isEncrypted = false) {
         this.id = id;
         this.manager = manager;
         this.name = name || `Terminal ${id}`;
         this.savedContent = savedContent;
         this.altBuffer = false;
+        this.wasEncrypted = Boolean(isEncrypted);
 
         this.socket = null;
         this.term = null;
@@ -342,7 +355,6 @@ class TerminalTab {
 
         this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
         this._pendingPassphrase = null;
-        this.wasEncrypted = false;
         this.isProcessExited = false;
 
         this.socket = io({
@@ -361,7 +373,11 @@ class TerminalTab {
         });
 
         this.setupSocketEvents();
-        if (this.savedContent) {
+        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+            this.element.classList.add('e2ee-shielded');
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.add('e2ee-shielded');
+        } else if (this.savedContent) {
             this.term.write(this.savedContent);
             this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
         }
@@ -399,7 +415,6 @@ class TerminalTab {
                 return;
             }
             this.socket.emit('terminal:input', data);
-            this.manager.saveState();
         });
 
         // Initial Resize Request
@@ -508,10 +523,18 @@ class TerminalTab {
             if (this.tabElement) {
                 this.tabElement.classList.add('tab-encrypted');
             }
+            if (this.element) {
+                this.element.classList.remove('e2ee-shielded');
+            }
+            const container = document.getElementById('terminals-container');
+            if (container) {
+                container.classList.remove('e2ee-shielded');
+            }
             if (this.isActive()) {
                 updateE2EEUI(true);
             }
-            this.term.write('\r\n\x1b[32m✔ End-to-End Encryption Active (Protected) 🔒\x1b[0m\r\n');
+            this._lastCols = null;
+            this._lastRows = null;
             this.term.focus();
             this.resize();
         });
@@ -681,6 +704,7 @@ class TerminalTab {
         this.term.focus();
         this.resize();
         this.syncStatus();
+        this.startLatencyCheck();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
         if (this.socket && !this.socket.connected && !this.isProcessExited) {
             this.socket.connect();
@@ -704,6 +728,7 @@ class TerminalTab {
     deactivate() {
         this.element.classList.remove('active');
         this.tabElement.classList.remove('active');
+        clearInterval(this.pingInterval);
     }
 
     resize() {
@@ -805,9 +830,12 @@ class TabManager {
         setInterval(() => this.saveState(), 5000);
     }
 
-    createTab(name = null, content = '') {
-        const id = this.nextId++;
-        const tab = new TerminalTab(id, this, name, content);
+    createTab(name = null, content = '', specificId = null, isEncrypted = false) {
+        const id = (specificId !== null && specificId !== undefined) ? specificId : this.nextId++;
+        if (id >= this.nextId) {
+            this.nextId = id + 1;
+        }
+        const tab = new TerminalTab(id, this, name, content, isEncrypted);
         this.tabs.set(id, tab);
         this.setActiveTab(id);
 
@@ -835,13 +863,18 @@ class TabManager {
                     state.tabs.push({
                         id: t.id,
                         name: t.name,
-                        content: t.getContent()
+                        isEncrypted: Boolean(t.wasEncrypted),
+                        content: t.wasEncrypted ? '' : t.getContent()
                     });
                 }
             });
         });
 
-        localStorage.setItem('wiredterm-state', JSON.stringify(state));
+        try {
+            localStorage.setItem('wiredterm-state', JSON.stringify(state));
+        } catch (e) {
+            console.warn("Failed to persist state:", e.message);
+        }
     }
 
     restoreState() {
@@ -859,10 +892,17 @@ class TabManager {
                 document.getElementById('grid-mode-btn').style.color = '#7ee787';
             }
 
+            if (state.nextId && Number.isInteger(state.nextId)) {
+                this.nextId = state.nextId;
+            }
+
             if (state.tabs && state.tabs.length > 0) {
                 state.tabs.forEach(t => {
-                    this.createTab(t.name, t.content);
+                    this.createTab(t.name, t.content, t.id, Boolean(t.isEncrypted));
                 });
+                if (state.activeId && this.tabs.has(state.activeId)) {
+                    this.setActiveTab(state.activeId);
+                }
             } else {
                 this.createTab();
             }

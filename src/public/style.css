@@ -755,6 +755,16 @@ html.light .custom-modal::backdrop {
     opacity: 0.9;
 }
 
+/* --- E2EE LOCKED / SHIELDED BUFFER STATE --- */
+#terminals-container.e2ee-shielded,
+.terminal-instance.e2ee-shielded {
+    filter: blur(14px) brightness(0.45);
+    opacity: 0.35;
+    pointer-events: none;
+    user-select: none;
+    transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
 /* --- E2EE MODAL STYLES --- */
 .e2ee-modal-header {
     display: flex;

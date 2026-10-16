@@ -13,6 +13,7 @@ import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import compression from 'compression';
 import os from 'os';
+import { exec } from 'child_process';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { ServerE2EESession, computeTranscriptChallenge, E2EE_CONSTANTS } from './e2ee.js';
 
@@ -697,6 +698,17 @@ io.on('connection', (socket) => {
         });
     };
 
+    const triggerTerminalRedraw = (proc, cols, rows) => {
+        if (!proc) return;
+        const safeCols = Math.max(1, Math.min(1000, cols || 80));
+        const safeRows = Math.max(1, Math.min(1000, rows || 30));
+        try { proc.resize(safeCols, safeRows + 1); } catch (e) {}
+        setTimeout(() => {
+            try { proc.resize(safeCols, safeRows); } catch (e) {}
+        }, 40);
+        exec(`tmux refresh-client -t "tab-${tabId}" 2>/dev/null`, () => {});
+    };
+
     const startPtyProcess = () => {
         if (sessionObj?.ptyProcess) return;
         const ptyProcess = pty.spawn('bash', [], {
@@ -744,7 +756,7 @@ io.on('connection', (socket) => {
         if (!isEncryptedTab) {
             bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
             try { sessionObj.ptyProcess.resume(); } catch (e) {}
-            try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
+            triggerTerminalRedraw(sessionObj.ptyProcess, initCols, initRows);
         } else {
             console.log(`[Tab ${tabId}] Holding PTY output until E2EE re-authentication completes.`);
         }
@@ -892,8 +904,10 @@ io.on('connection', (socket) => {
                 // Transition existing PTY to encrypted output listener and resume
                 bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
                 try { sessionObj.ptyProcess.resume(); } catch (e) {}
-                try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
             }
+
+            // Immediately force full-screen redraw for tmux/shell
+            triggerTerminalRedraw(sessionObj.ptyProcess, initCols, initRows);
         } catch (err) {
             console.error(`[Tab ${tabId}] E2EE verification error:`, err);
             socket.emit('e2ee:error', err.message || 'Verification error');

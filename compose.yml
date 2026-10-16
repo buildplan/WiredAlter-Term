@@ -8,6 +8,8 @@ services:
       - NETWORKS=1     # docker network ls
       - VOLUMES=1      # docker volume ls
       - INFO=1         # docker info
+      - PING=1         # docker ping/version negotiation
+      - VERSION=1      # docker version
       # --- TERMINAL EXECUTION ---
       - EXEC=1         # docker exec
       # --- STRICT SECURITY ---
