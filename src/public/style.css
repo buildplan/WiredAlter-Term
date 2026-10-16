@@ -760,7 +760,7 @@ html.light .custom-modal::backdrop {
 .terminal-instance.e2ee-shielded {
     filter: blur(14px) brightness(0.45);
     opacity: 0.35;
-    pointer-events: none;
+    cursor: pointer;
     user-select: none;
     transition: filter 0.25s ease, opacity 0.25s ease;
 }

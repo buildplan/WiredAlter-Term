@@ -614,6 +614,54 @@ const setupPersistence = () => {
     seedAndLink('.tmux.conf', false, join(seedDir, 'config/tmux.conf'));
     seedAndLink('storage', true);
 
+    // Automatic Migration for existing persistent configs
+    const starshipPath = join(dataDir, '.config/starship.toml');
+    if (fs.existsSync(starshipPath)) {
+        try {
+            let sc = fs.readFileSync(starshipPath, 'utf8');
+            let mod = false;
+            if (sc.includes('add_newline = true')) {
+                sc = sc.replace('add_newline = true', 'add_newline = false');
+                mod = true;
+            }
+            if (sc.includes('[docker_context]') && !sc.includes('disabled = true')) {
+                sc = sc.replace('[docker_context]', '[docker_context]\ndisabled = true');
+                mod = true;
+            } else if (!sc.includes('[docker_context]')) {
+                sc += '\n[docker_context]\ndisabled = true\n';
+                mod = true;
+            }
+            if (mod) {
+                fs.writeFileSync(starshipPath, sc, 'utf8');
+                console.log('   🛠️  Migrated persistent starship.toml (compact prompt, disabled docker_context)');
+            }
+        } catch (e) {
+            console.warn('   ⚠️  Could not migrate starship.toml:', e.message);
+        }
+    }
+
+    const bashrcPath = join(dataDir, '.bashrc');
+    if (fs.existsSync(bashrcPath)) {
+        try {
+            let bc = fs.readFileSync(bashrcPath, 'utf8');
+            let mod = false;
+            if (bc.includes('    tmux new-session -A -s "$SESSION_NAME"')) {
+                bc = bc.replace('    tmux new-session -A -s "$SESSION_NAME"', '    exec tmux new-session -A -s "$SESSION_NAME"');
+                mod = true;
+            }
+            if (bc.includes('; tmux new-session -A -s "$SESSION_NAME"')) {
+                bc = bc.replace('; tmux new-session -A -s "$SESSION_NAME"', '; exec tmux new-session -A -s "$SESSION_NAME"');
+                mod = true;
+            }
+            if (mod) {
+                fs.writeFileSync(bashrcPath, bc, 'utf8');
+                console.log('   🛠️  Migrated persistent .bashrc (added exec to tmux auto-start)');
+            }
+        } catch (e) {
+            console.warn('   ⚠️  Could not migrate .bashrc:', e.message);
+        }
+    }
+
     if (!fs.existsSync('/data/sessions')) {
         fs.mkdirSync('/data/sessions', { recursive: true });
         console.log('   🌱 Created persistent session directory');

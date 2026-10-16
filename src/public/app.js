@@ -343,9 +343,19 @@ class TerminalTab {
             this.term.textarea.setAttribute('autocomplete', 'new-password');
             this.term.textarea.setAttribute('inputmode', 'email');
         }
-        this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
+        this.element.addEventListener('mousedown', (e) => {
+            if (e.button === 2) e.stopPropagation();
+            if (this.term) this.term.focus();
+        }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
+        this.element.addEventListener('click', (e) => {
+            if (e.button === 2) e.stopPropagation();
+            if (this.element.classList.contains('e2ee-shielded') && (!this.e2ee || !this.e2ee.isReady)) {
+                this.initiateE2EE();
+            } else if (this.term) {
+                this.term.focus();
+            }
+        }, true);
 
         try {
             this.fitAddon.fit();
@@ -377,9 +387,6 @@ class TerminalTab {
             this.element.classList.add('e2ee-shielded');
             const container = document.getElementById('terminals-container');
             if (container) container.classList.add('e2ee-shielded');
-        } else if (this.savedContent) {
-            this.term.write(this.savedContent);
-            this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
         }
 
         if (this.term.textarea) {
@@ -467,6 +474,11 @@ class TerminalTab {
             }
             if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
                 this.initiateE2EE(status);
+            } else if (!status.forceE2EE && !this.wasEncrypted) {
+                if (this.element) this.element.classList.remove('e2ee-shielded');
+                const container = document.getElementById('terminals-container');
+                if (container) container.classList.remove('e2ee-shielded');
+                if (this.isActive()) this.term.focus();
             }
         });
 
@@ -560,8 +572,12 @@ class TerminalTab {
             this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
             this.syncStatus();
             if (this.isActive()) {
+                this.term.focus();
                 this.startLatencyCheck();
-                setTimeout(() => this.resize(), 100);
+                setTimeout(() => {
+                    this.resize();
+                    this.term.focus();
+                }, 100);
             }
         });
 
@@ -686,9 +702,7 @@ class TerminalTab {
     }
 
     getContent() {
-        if (this.altBuffer) { return this.savedContent; }
-        this.savedContent = this.serializeAddon ? this.serializeAddon.serialize() : '';
-        return this.savedContent;
+        return '';
     }
 
     isActive() {
@@ -710,8 +724,14 @@ class TerminalTab {
             this.socket.connect();
         }
         setTimeout(() => {
-            if (this.isActive()) this.syncStatus();
+            if (this.isActive()) {
+                this.term.focus();
+                this.syncStatus();
+            }
         }, 100);
+        setTimeout(() => {
+            if (this.isActive()) this.term.focus();
+        }, 300);
     }
 
     syncStatus() {
@@ -864,7 +884,7 @@ class TabManager {
                         id: t.id,
                         name: t.name,
                         isEncrypted: Boolean(t.wasEncrypted),
-                        content: t.wasEncrypted ? '' : t.getContent()
+                        content: ''
                     });
                 }
             });
@@ -1035,6 +1055,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     window.tabManager = new TabManager();
+
+    if (termContainer) {
+        termContainer.addEventListener('click', () => {
+            const active = window.tabManager ? window.tabManager.getActiveTab() : null;
+            if (active && active.term) active.term.focus();
+        });
+    }
+
+    window.addEventListener('focus', () => {
+        const active = window.tabManager ? window.tabManager.getActiveTab() : null;
+        if (active && active.term) active.term.focus();
+    });
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
