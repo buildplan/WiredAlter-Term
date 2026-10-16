@@ -385,13 +385,20 @@ class TerminalTab {
                 }
                 return;
             }
-            if (this.e2ee && this.e2ee.isReady) {
-                this.e2ee.enqueueEncryptInput(data, (wireBuf) => {
-                    this.socket.emit('terminal:input:enc', wireBuf);
-                });
-            } else if (!serverE2EEStatus?.forceE2EE) {
-                this.socket.emit('terminal:input', data);
+            if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                if (this.e2ee && this.e2ee.isReady) {
+                    const dataBytes = new TextEncoder().encode(data);
+                    const framed = new Uint8Array(1 + dataBytes.length);
+                    framed[0] = 0x01; // OP_INPUT
+                    framed.set(dataBytes, 1);
+                    this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                        this.socket.emit('terminal:input:enc', wireBuf);
+                    });
+                }
+                // Never emit plaintext if this tab was encrypted!
+                return;
             }
+            this.socket.emit('terminal:input', data);
             this.manager.saveState();
         });
 
@@ -702,21 +709,26 @@ class TerminalTab {
     resize() {
         try {
             this.fitAddon.fit();
+            const cols = this.term.cols || 80;
+            const rows = this.term.rows || 30;
+            if (this._lastCols === cols && this._lastRows === rows) return;
+            this._lastCols = cols;
+            this._lastRows = rows;
+
             if (this.socket && this.socket.connected) {
-                if (this.e2ee && this.e2ee.isReady) {
-                    const payload = JSON.stringify({
-                        cols: this.term.cols,
-                        rows: this.term.rows
-                    });
-                    this.e2ee.enqueueEncryptInput(payload, (wireBuf) => {
-                        this.socket.emit('terminal:resize:enc', wireBuf);
-                    });
-                } else if (!serverE2EEStatus?.forceE2EE) {
-                    this.socket.emit('terminal:resize', {
-                        cols: this.term.cols,
-                        rows: this.term.rows
-                    });
+                if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                    if (this.e2ee && this.e2ee.isReady) {
+                        const jsonBytes = new TextEncoder().encode(JSON.stringify({ cols, rows }));
+                        const framed = new Uint8Array(1 + jsonBytes.length);
+                        framed[0] = 0x02; // OP_RESIZE
+                        framed.set(jsonBytes, 1);
+                        this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                            this.socket.emit('terminal:input:enc', wireBuf);
+                        });
+                    }
+                    return;
                 }
+                this.socket.emit('terminal:resize', { cols, rows });
             }
         } catch (e) { /* Ignore resize errors if hidden */ }
     }

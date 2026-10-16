@@ -649,8 +649,13 @@ io.on('connection', (socket) => {
     }
 
     const tabId = String(socket.handshake.query.tabId);
+    let sessionObj = activeTabSessions.get(tabId);
+
     const effectivePassphrase = getEffectiveE2EEPassphrase();
     const effectiveForceE2EE = isForceE2EE();
+    // If this session previously established encryption, preserve encryption requirement!
+    const isEncryptedTab = Boolean(sessionObj?.isEncrypted || effectiveForceE2EE);
+
     const e2ee = new ServerE2EESession(E2EE_PBKDF2_ITERATIONS);
     const passkeyRows = db.prepare('SELECT COUNT(*) as c FROM passkeys').get();
     const hasPasskeys = (passkeyRows?.c || 0) > 0;
@@ -661,7 +666,7 @@ io.on('connection', (socket) => {
 
     // Emit initial status so client knows if E2EE is required, available, and iterations
     socket.emit('e2ee:status', {
-        forceE2EE: effectiveForceE2EE,
+        forceE2EE: isEncryptedTab,
         availableModes,
         iterations: E2EE_PBKDF2_ITERATIONS
     });
@@ -672,8 +677,6 @@ io.on('connection', (socket) => {
 
     const initCols = parseInt(socket.handshake.query.cols, 10) || 80;
     const initRows = parseInt(socket.handshake.query.rows, 10) || 30;
-
-    let sessionObj = activeTabSessions.get(tabId);
 
     const bindPtyOutput = (proc, sock, cipherSession) => {
         if (proc._wiredDataDisposable) {
@@ -688,7 +691,7 @@ io.on('connection', (socket) => {
                 } catch (err) {
                     console.error(`[Tab ${tabId}] Encryption output failed:`, err.message);
                 }
-            } else {
+            } else if (!isEncryptedTab) {
                 sock.emit('terminal:output', data);
             }
         });
@@ -734,12 +737,16 @@ io.on('connection', (socket) => {
             try { sessionObj.socket.disconnect(true); } catch (e) { }
         }
         sessionObj.socket = socket;
-        sessionObj.e2ee = e2ee;
 
-        // If not in strict E2EE, re-bind output and trigger resize
-        if (!effectiveForceE2EE) {
+        // CRITICAL SECURITY FIX:
+        // If this tab was encrypted, DO NOT bind plaintext output and DO NOT resume PTY yet!
+        // The PTY remains paused until e2ee:verify succeeds with fresh keys.
+        if (!isEncryptedTab) {
             bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
+            try { sessionObj.ptyProcess.resume(); } catch (e) {}
             try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
+        } else {
+            console.log(`[Tab ${tabId}] Holding PTY output until E2EE re-authentication completes.`);
         }
     } else {
         sessionObj = {
@@ -747,12 +754,13 @@ io.on('connection', (socket) => {
             ptyProcess: null,
             e2ee,
             socket,
-            disconnectTimer: null
+            disconnectTimer: null,
+            isEncrypted: isEncryptedTab
         };
         activeTabSessions.set(tabId, sessionObj);
 
         // Delay PTY spawning in Strict Mode until e2ee:verify succeeds!
-        if (!effectiveForceE2EE) {
+        if (!isEncryptedTab) {
             startPtyProcess();
         }
     }
@@ -874,14 +882,16 @@ io.on('connection', (socket) => {
             }
 
             sessionObj.e2ee = e2ee;
+            sessionObj.isEncrypted = true;
             socket.emit('e2ee:ready', { mode: e2ee.mode });
 
             // If PTY not yet spawned (Strict Mode), spawn it now!
             if (!sessionObj.ptyProcess) {
                 startPtyProcess();
             } else {
-                // Transition existing PTY to encrypted output listener
+                // Transition existing PTY to encrypted output listener and resume
                 bindPtyOutput(sessionObj.ptyProcess, socket, e2ee);
+                try { sessionObj.ptyProcess.resume(); } catch (e) {}
                 try { sessionObj.ptyProcess.resize(initCols, initRows); } catch (e) { }
             }
         } catch (err) {
@@ -891,14 +901,39 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Encrypted terminal handlers
+    // Encrypted terminal handlers (Unified multiplexed stream: 0x01 = input, 0x02 = resize)
     socket.on('terminal:input:enc', (wireBuffer) => {
         const proc = sessionObj?.ptyProcess;
         if (!e2ee.isVerified || !proc) return;
         try {
             const plaintextBuf = e2ee.decryptInput(wireBuffer);
-            proc.write(plaintextBuf.toString('utf8'));
-            touchSession();
+            if (plaintextBuf.length > 0 && plaintextBuf[0] === 0x01) {
+                // Opcode 0x01: Keystroke input
+                proc.write(plaintextBuf.subarray(1).toString('utf8'));
+                touchSession();
+            } else if (plaintextBuf.length > 0 && plaintextBuf[0] === 0x02) {
+                // Opcode 0x02: Terminal resize
+                try {
+                    const { cols, rows } = JSON.parse(plaintextBuf.subarray(1).toString('utf8'));
+                    const safeCols = Math.max(1, Math.min(1000, cols || 80));
+                    const safeRows = Math.max(1, Math.min(1000, rows || 30));
+                    proc.resize(safeCols, safeRows);
+                } catch (err) {
+                    console.warn(`[Tab ${tabId}] Failed to parse resize payload:`, err.message);
+                }
+            } else {
+                // Backward-compatible fallback for raw text or raw JSON
+                const str = plaintextBuf.toString('utf8');
+                try {
+                    const parsed = JSON.parse(str);
+                    if (parsed.cols && parsed.rows) {
+                        proc.resize(Math.max(1, Math.min(1000, parsed.cols)), Math.max(1, Math.min(1000, parsed.rows)));
+                        return;
+                    }
+                } catch (e) {}
+                proc.write(str);
+                touchSession();
+            }
         } catch (err) {
             console.error(`[Tab ${tabId}] Failed to decrypt terminal input:`, err.message);
             socket.disconnect(true);
@@ -910,7 +945,10 @@ io.on('connection', (socket) => {
         if (!e2ee.isVerified || !proc) return;
         try {
             const plaintextBuf = e2ee.decryptInput(wireBuffer);
-            const { cols, rows } = JSON.parse(plaintextBuf.toString('utf8'));
+            const raw = (plaintextBuf.length > 0 && plaintextBuf[0] === 0x02)
+                ? plaintextBuf.subarray(1).toString('utf8')
+                : plaintextBuf.toString('utf8');
+            const { cols, rows } = JSON.parse(raw);
             const safeCols = Math.max(1, Math.min(1000, cols || 80));
             const safeRows = Math.max(1, Math.min(1000, rows || 30));
             proc.resize(safeCols, safeRows);
@@ -920,10 +958,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Plaintext input (only allowed if NOT enforced and NOT verified)
+    // Plaintext input (strictly prohibited if session was encrypted or isForceE2EE)
     socket.on('terminal:input', (data) => {
         const proc = sessionObj?.ptyProcess;
-        if (isForceE2EE() || e2ee.isVerified) return;
+        if (isForceE2EE() || sessionObj?.isEncrypted || e2ee.isVerified) return;
         if (typeof data !== 'string' || !proc) return;
         try {
             proc.write(data);
@@ -935,7 +973,7 @@ io.on('connection', (socket) => {
 
     socket.on('terminal:resize', ({ cols, rows }) => {
         const proc = sessionObj?.ptyProcess;
-        if (isForceE2EE() || e2ee.isVerified) return;
+        if (isForceE2EE() || sessionObj?.isEncrypted || e2ee.isVerified) return;
         if (!proc) return;
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
@@ -964,6 +1002,9 @@ io.on('connection', (socket) => {
         // Only start grace period if this socket was the active socket for the session
         if (sessionObj.socket === socket) {
             console.log(`[Tab ${tabId}] Disconnected (${reason}). Holding session for ${DISCONNECT_GRACE_MS / 1000}s grace period...`);
+            // Pause PTY immediately upon disconnect to prevent leaking output or running unmonitored
+            try { sessionObj.ptyProcess.pause(); } catch (e) {}
+
             if (sessionObj.disconnectTimer) clearTimeout(sessionObj.disconnectTimer);
             sessionObj.disconnectTimer = setTimeout(() => {
                 console.log(`[Tab ${tabId}] Grace period expired. Terminating PTY process.`);
