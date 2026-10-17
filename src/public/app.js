@@ -69,16 +69,30 @@ function updateE2EEUI(isEncrypted) {
     }
 }
 
-function promptE2EE(status = serverE2EEStatus) {
+let pendingE2EEPrompt = null;
+// Browsers allow one WebAuthn ceremony at a time; concurrent tabs would abort each other.
+let passkeyCeremonyQueue = Promise.resolve();
+
+function promptE2EE(status = serverE2EEStatus, errorMsg = '') {
+    if (cachedSessionPassphrase && !errorMsg) {
+        return Promise.resolve({ mode: 'passphrase', passphrase: cachedSessionPassphrase });
+    }
+    // The modal is shared by all tabs; every waiting tab must get the same answer.
+    if (pendingE2EEPrompt) return pendingE2EEPrompt;
+    pendingE2EEPrompt = promptE2EEModal(status, errorMsg).finally(() => { pendingE2EEPrompt = null; });
+    return pendingE2EEPrompt;
+}
+
+function promptE2EEModal(status, errorMsg) {
     return new Promise((resolve, reject) => {
-        if (cachedSessionPassphrase) {
-            return resolve({ mode: 'passphrase', passphrase: cachedSessionPassphrase });
-        }
+
+        const container = document.getElementById('terminals-container');
+        if (container) container.classList.add('e2ee-shielded');
 
         pendingE2EEResolve = resolve;
         pendingE2EEReject = reject;
 
-        if (e2eeFeedbackMsg) e2eeFeedbackMsg.textContent = '';
+        if (e2eeFeedbackMsg) e2eeFeedbackMsg.textContent = errorMsg || '';
         if (e2eePassphraseInput) e2eePassphraseInput.value = '';
 
         const hasPasskeys = status?.availableModes?.passkey;
@@ -107,6 +121,9 @@ if (e2eePasskeyBtn) {
     e2eePasskeyBtn.addEventListener('click', () => {
         if (pendingE2EEResolve) {
             if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
+            // Keep terminals container shielded while browser/OS passkey prompt is shown!
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.add('e2ee-shielded');
             const res = pendingE2EEResolve;
             pendingE2EEResolve = null;
             pendingE2EEReject = null;
@@ -140,9 +157,22 @@ if (e2eePassphraseInput) {
         }
     });
 }
+if (e2eeModal) {
+    // Escape would close the dialog without settling the pending prompt and wedge every tab.
+    e2eeModal.addEventListener('cancel', (e) => {
+        e.preventDefault();
+        if (!serverE2EEStatus?.forceE2EE && e2eeModalCancel) e2eeModalCancel.click();
+    });
+}
 if (e2eeModalCancel) {
     e2eeModalCancel.addEventListener('click', () => {
         if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
+        const activeTab = window.tabManager?.getActiveTab();
+        if (!activeTab?.wasEncrypted && !serverE2EEStatus?.forceE2EE) {
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.remove('e2ee-shielded');
+            if (activeTab?.element) activeTab.element.classList.remove('e2ee-shielded');
+        }
         if (pendingE2EEReject) {
             const rej = pendingE2EEReject;
             pendingE2EEResolve = null;
@@ -156,7 +186,10 @@ if (e2eeBtn) {
         const activeTab = window.tabManager?.getActiveTab();
         if (!activeTab) return;
         if (activeTab.e2ee && activeTab.e2ee.isReady) {
-            const msg = 'This terminal tab is end-to-end encrypted (E2EE Active 🔒).\n\nKeystrokes, passwords, and screen buffers are shielded from proxy inspection.';
+            const cipherInfo = activeTab.e2ee.mode === 'passkey'
+                ? 'Passkey (P-256 ECDH + HKDF-SHA256 + AES-GCM-256)'
+                : 'Passphrase (PBKDF2-HMAC-SHA256 + AES-GCM-256)';
+            const msg = `This terminal tab is end-to-end encrypted (E2EE Active 🔒).\n\nCipher: ${cipherInfo}\n\nKeystrokes, passwords, and screen buffers are shielded from TLS proxy inspection.`;
             if (typeof window.showCustomAlert === 'function') {
                 await window.showCustomAlert(msg, 'E2EE Status');
             } else {
@@ -252,12 +285,13 @@ async function waitForFonts() {
 
 // --- TERMINAL TAB CLASS ---
 class TerminalTab {
-    constructor(id, manager, name = null, savedContent = '') {
+    constructor(id, manager, name = null, savedContent = '', isEncrypted = false) {
         this.id = id;
         this.manager = manager;
         this.name = name || `Terminal ${id}`;
         this.savedContent = savedContent;
         this.altBuffer = false;
+        this.wasEncrypted = Boolean(isEncrypted);
 
         this.socket = null;
         this.term = null;
@@ -285,6 +319,7 @@ class TerminalTab {
             allowTransparency: true,
             theme: themes[currentTheme],
             scrollback: 5000,
+            allowProposedApi: true,
             allowMouseReporting: mouseReportingEnabled
         });
 
@@ -327,10 +362,20 @@ class TerminalTab {
             this.term.textarea.setAttribute('autocomplete', 'new-password');
             this.term.textarea.setAttribute('inputmode', 'email');
         }
-        this.element.addEventListener('mousedown', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
+        this.element.addEventListener('mousedown', (e) => {
+            if (e.button === 2) e.stopPropagation();
+            if (this.term) this.term.focus();
+        }, true);
         this.element.addEventListener('mouseup', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        this.element.addEventListener('click', (e) => { if (e.button === 2) e.stopPropagation(); }, true);
-        
+        this.element.addEventListener('click', (e) => {
+            if (e.button === 2) e.stopPropagation();
+            if (this.element.classList.contains('e2ee-shielded') && (!this.e2ee || !this.e2ee.isReady)) {
+                this.initiateE2EE();
+            } else if (this.term) {
+                this.term.focus();
+            }
+        }, true);
+
         try {
             this.fitAddon.fit();
         } catch (e) {
@@ -339,13 +384,16 @@ class TerminalTab {
 
         this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
         this._pendingPassphrase = null;
+        this.isProcessExited = false;
 
         this.socket = io({
             forceNew: true,
             multiplex: false,
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000,
             query: {
                 cols: this.term.cols || 80,
                 rows: this.term.rows || 30,
@@ -354,9 +402,10 @@ class TerminalTab {
         });
 
         this.setupSocketEvents();
-        if (this.savedContent) {
-            this.term.write(this.savedContent);
-            this.term.write('\r\n\x1b[30;43m ⚡ Session Restored (Process Restarted) \x1b[0m\r\n');
+        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+            this.element.classList.add('e2ee-shielded');
+            const container = document.getElementById('terminals-container');
+            if (container) container.classList.add('e2ee-shielded');
         }
 
         if (this.term.textarea) {
@@ -368,14 +417,30 @@ class TerminalTab {
         }
 
         this.term.onData((data) => {
-            if (this.e2ee && this.e2ee.isReady) {
-                this.e2ee.enqueueEncryptInput(data, (wireBuf) => {
-                    this.socket.emit('terminal:input:enc', wireBuf);
-                });
-            } else if (!serverE2EEStatus?.forceE2EE) {
-                this.socket.emit('terminal:input', data);
+            if (this.isProcessExited) {
+                if (data.includes('\r') || data.includes('\n')) {
+                    this.isProcessExited = false;
+                    this.term.write('\r\n\x1b[36m⚡ Restarting session...\x1b[0m\r\n');
+                    if (this.socket) {
+                        this.socket.connect();
+                    }
+                }
+                return;
             }
-            this.manager.saveState();
+            if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                if (this.e2ee && this.e2ee.isReady) {
+                    const dataBytes = new TextEncoder().encode(data);
+                    const framed = new Uint8Array(1 + dataBytes.length);
+                    framed[0] = 0x01; // OP_INPUT
+                    framed.set(dataBytes, 1);
+                    this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                        this.socket.emit('terminal:input:enc', wireBuf);
+                    });
+                }
+                // Never emit plaintext if this tab was encrypted!
+                return;
+            }
+            this.socket.emit('terminal:input', data);
         });
 
         // Initial Resize Request
@@ -405,10 +470,13 @@ class TerminalTab {
         this.term.write(data);
     }
 
-    async initiateE2EE(status = serverE2EEStatus) {
+    async initiateE2EE(status = serverE2EEStatus, errorMsg = '') {
         if (this.e2ee && this.e2ee.isReady) return;
+        if (this._e2eeInFlight) return;
+        this._e2eeInFlight = true;
         try {
-            const choice = await promptE2EE(status);
+            const choice = await promptE2EE(status, errorMsg);
+            if (this.e2ee && this.e2ee.isReady) { this._e2eeInFlight = false; return; }
             if (choice.mode === 'passkey') {
                 this.socket.emit('e2ee:init', { mode: 'passkey' });
             } else {
@@ -416,6 +484,7 @@ class TerminalTab {
                 this.socket.emit('e2ee:init', { mode: 'passphrase' });
             }
         } catch (err) {
+            this._e2eeInFlight = false;
             console.warn("E2EE unlock cancelled:", err);
         }
     }
@@ -424,10 +493,19 @@ class TerminalTab {
         this.socket.on('e2ee:status', (status) => {
             serverE2EEStatus = status;
             if (this.isActive()) {
-                updateE2EEUI(this.e2ee.isReady);
+                updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
-            if (status.forceE2EE && !this.e2ee.isReady) {
-                this.initiateE2EE(status);
+            if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
+                if (this.isActive()) {
+                    const notice = this._e2eeNotice || '';
+                    this._e2eeNotice = null;
+                    this.initiateE2EE(status, notice);
+                }
+            } else if (!status.forceE2EE && !this.wasEncrypted) {
+                if (this.element) this.element.classList.remove('e2ee-shielded');
+                const container = document.getElementById('terminals-container');
+                if (container) container.classList.remove('e2ee-shielded');
+                if (this.isActive()) this.term.focus();
             }
         });
 
@@ -444,71 +522,123 @@ class TerminalTab {
         });
 
         this.socket.on('e2ee:challenge', async (challengePayload) => {
+            if (this.e2ee && this.e2ee.isReady) return;
+            const session = this.e2ee;
+            const isStale = () => this.e2ee !== session;
             try {
                 if (challengePayload.mode === 'passkey') {
                     if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.startAuthentication) {
                         throw new Error("WebAuthn library not loaded. Try refreshing.");
                     }
-                    const assertionResult = await this.e2ee.completePasskeyChallenge(
-                        challengePayload,
-                        window.SimpleWebAuthnBrowser.startAuthentication
-                    );
+                    const ceremony = passkeyCeremonyQueue.then(() => {
+                        if (isStale()) return null;
+                        return session.completePasskeyChallenge(
+                            challengePayload,
+                            window.SimpleWebAuthnBrowser.startAuthentication
+                        );
+                    });
+                    passkeyCeremonyQueue = ceremony.catch(() => {});
+                    const assertionResult = await ceremony;
+                    if (!assertionResult || isStale()) return;
                     this.socket.emit('e2ee:verify', assertionResult);
                 } else {
                     const passphrase = this._pendingPassphrase || cachedSessionPassphrase;
-                    const encryptedProof = await this.e2ee.completePassphraseChallenge(
+                    const encryptedProof = await session.completePassphraseChallenge(
                         passphrase,
                         challengePayload.salt,
                         challengePayload.serverNonce,
                         challengePayload.iterations
                     );
+                    if (isStale()) return;
                     this.socket.emit('e2ee:verify', { mode: 'passphrase', encryptedProof });
                 }
             } catch (err) {
+                if (isStale()) return;
                 console.error("E2EE Challenge completion error:", err);
-                if (e2eeFeedbackMsg) {
-                    const msg = err.name === 'NotAllowedError'
-                        ? 'Passkey was cancelled or timed out. Try again.'
-                        : (err.message || 'Authentication error');
-                    e2eeFeedbackMsg.textContent = msg;
-                    if (e2eeModal && !e2eeModal.open && typeof e2eeModal.showModal === 'function') {
-                        e2eeModal.showModal();
-                    }
-                }
+                this._e2eeInFlight = false;
+                const msg = err.name === 'NotAllowedError'
+                    ? 'Passkey was cancelled or timed out. Try again.'
+                    : (err.message || 'Authentication error');
+                // The previous prompt already resolved, so re-open it or its buttons do nothing.
+                this.initiateE2EE(serverE2EEStatus, msg);
             }
         });
 
         this.socket.on('e2ee:ready', (data) => {
+            this._e2eeInFlight = false;
+            this._e2eeNotice = null;
             this.e2ee.markReady();
+            this.wasEncrypted = true;
+            if (this.tabElement) {
+                this.tabElement.classList.add('tab-encrypted');
+            }
+            if (this.element) {
+                this.element.classList.remove('e2ee-shielded');
+            }
+            const container = document.getElementById('terminals-container');
+            if (container) {
+                container.classList.remove('e2ee-shielded');
+            }
             if (this.isActive()) {
                 updateE2EEUI(true);
             }
-            this.term.write('\r\n\x1b[32m✔ End-to-End Encryption Active (Protected) 🔒\x1b[0m\r\n');
+            this._lastCols = null;
+            this._lastRows = null;
             this.term.focus();
             this.resize();
         });
 
         this.socket.on('e2ee:error', (msg) => {
             console.error("E2EE Error from server:", msg);
-            if (e2eeFeedbackMsg) {
-                e2eeFeedbackMsg.textContent = msg;
-                if (e2eeModal && !e2eeModal.open && typeof e2eeModal.showModal === 'function') {
-                    e2eeModal.showModal();
+            this._e2eeInFlight = false;
+            cachedSessionPassphrase = null;
+            // Fatal errors make the server drop the socket; the reconnect's status event shows the prompt.
+            this._e2eeNotice = msg;
+            setTimeout(() => {
+                if (this._e2eeNotice && this.socket?.connected && !this._e2eeInFlight && !(this.e2ee && this.e2ee.isReady)) {
+                    this.initiateE2EE(serverE2EEStatus, this._e2eeNotice);
                 }
-            }
+            }, 2500);
+        });
+
+        this.socket.on('terminal:exit', ({ code }) => {
+            this.isProcessExited = true;
+            this.term.write(`\r\n\x1b[33m[Process exited (code ${code}). Press Enter to restart]\x1b[0m\r\n`);
         });
 
         this.socket.on('connect', () => {
+            this.isProcessExited = false;
+            this._e2eeInFlight = false;
+            // On fresh connection, re-instantiate client E2EE session for fresh keys
+            this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+            this.syncStatus();
+            this._lastCols = null;
+            this._lastRows = null;
             if (this.isActive()) {
-                this.syncStatus();
+                this.term.focus();
                 this.startLatencyCheck();
-                this.resize();
+                setTimeout(() => {
+                    this.resize();
+                    this.term.focus();
+                }, 100);
             }
         });
 
-        this.socket.on('disconnect', () => {
+        this.socket.on('disconnect', (reason) => {
             if (this.isActive()) this.updateStatus('disconnected');
             clearInterval(this.pingInterval);
+
+            // If disconnected by server, transport, or ping timeout, attempt reconnect
+            if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'ping timeout') {
+                if (!this.isProcessExited) {
+                    setTimeout(() => {
+                        if (this.socket && !this.socket.connected) {
+                            if (this.isActive()) this.updateStatus('connecting');
+                            this.socket.connect();
+                        }
+                    }, 1000);
+                }
+            }
         });
 
         this.socket.on('connect_error', () => {
@@ -615,9 +745,7 @@ class TerminalTab {
     }
 
     getContent() {
-        if (this.altBuffer) { return this.savedContent; }
-        this.savedContent = this.serializeAddon ? this.serializeAddon.serialize() : '';
-        return this.savedContent;
+        return '';
     }
 
     isActive() {
@@ -627,19 +755,37 @@ class TerminalTab {
     activate() {
         this.element.classList.add('active');
         this.tabElement.classList.add('active');
+        if (this.tabElement) {
+            this.tabElement.classList.toggle('tab-encrypted', Boolean(this.e2ee && this.e2ee.isReady));
+        }
         this.term.focus();
         this.resize();
         this.syncStatus();
+        this.startLatencyCheck();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
+        if (this.socket && this.socket.connected && serverE2EEStatus
+            && (this.wasEncrypted || serverE2EEStatus.forceE2EE) && !(this.e2ee && this.e2ee.isReady)) {
+            this.initiateE2EE();
+        }
+        if (this.socket && !this.socket.connected && !this.isProcessExited) {
+            this.socket.connect();
+        }
         setTimeout(() => {
-            if (this.isActive()) this.syncStatus();
+            if (this.isActive()) {
+                this.term.focus();
+                this.syncStatus();
+            }
         }, 100);
+        setTimeout(() => {
+            if (this.isActive()) this.term.focus();
+        }, 300);
     }
 
     syncStatus() {
-        if (this.socket.connected) {
+        if (!this.isActive()) return;
+        if (this.socket && this.socket.connected) {
             this.updateStatus('connected');
-        } else if (this.socket.io.engine.readyState === 'opening') {
+        } else if (this.socket && this.socket.io && this.socket.io.engine && this.socket.io.engine.readyState === 'opening') {
             this.updateStatus('connecting');
         } else {
             this.updateStatus('disconnected');
@@ -649,31 +795,38 @@ class TerminalTab {
     deactivate() {
         this.element.classList.remove('active');
         this.tabElement.classList.remove('active');
+        clearInterval(this.pingInterval);
     }
 
     resize() {
         try {
             this.fitAddon.fit();
+            const cols = this.term.cols || 80;
+            const rows = this.term.rows || 30;
+            if (this._lastCols === cols && this._lastRows === rows) return;
+            this._lastCols = cols;
+            this._lastRows = rows;
+
             if (this.socket && this.socket.connected) {
-                if (this.e2ee && this.e2ee.isReady) {
-                    const payload = JSON.stringify({
-                        cols: this.term.cols,
-                        rows: this.term.rows
-                    });
-                    this.e2ee.enqueueEncryptInput(payload, (wireBuf) => {
-                        this.socket.emit('terminal:resize:enc', wireBuf);
-                    });
-                } else if (!serverE2EEStatus?.forceE2EE) {
-                    this.socket.emit('terminal:resize', {
-                        cols: this.term.cols,
-                        rows: this.term.rows
-                    });
+                if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                    if (this.e2ee && this.e2ee.isReady) {
+                        const jsonBytes = new TextEncoder().encode(JSON.stringify({ cols, rows }));
+                        const framed = new Uint8Array(1 + jsonBytes.length);
+                        framed[0] = 0x02; // OP_RESIZE
+                        framed.set(jsonBytes, 1);
+                        this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                            this.socket.emit('terminal:input:enc', wireBuf);
+                        });
+                    }
+                    return;
                 }
+                this.socket.emit('terminal:resize', { cols, rows });
             }
         } catch (e) { /* Ignore resize errors if hidden */ }
     }
 
     updateStatus(state) {
+        if (!this.isActive()) return;
         if (state === 'connected') {
             statusElem.innerHTML = '<span class="status-icon">🟢</span> <span class="status-text">Connected</span>';
             statusElem.style.color = '#7ee787';
@@ -704,6 +857,7 @@ class TerminalTab {
         if (this.resizeObserver) { this.resizeObserver.disconnect(); }
         try {
             if (this.socket) {
+                this.socket.emit('terminal:close');
                 this.socket.disconnect();
             }
         } catch (e) {
@@ -743,9 +897,12 @@ class TabManager {
         setInterval(() => this.saveState(), 5000);
     }
 
-    createTab(name = null, content = '') {
-        const id = this.nextId++;
-        const tab = new TerminalTab(id, this, name, content);
+    createTab(name = null, content = '', specificId = null, isEncrypted = false) {
+        const id = (specificId !== null && specificId !== undefined) ? specificId : this.nextId++;
+        if (id >= this.nextId) {
+            this.nextId = id + 1;
+        }
+        const tab = new TerminalTab(id, this, name, content, isEncrypted);
         this.tabs.set(id, tab);
         this.setActiveTab(id);
 
@@ -773,13 +930,18 @@ class TabManager {
                     state.tabs.push({
                         id: t.id,
                         name: t.name,
-                        content: t.getContent()
+                        isEncrypted: Boolean(t.wasEncrypted),
+                        content: ''
                     });
                 }
             });
         });
 
-        localStorage.setItem('wiredterm-state', JSON.stringify(state));
+        try {
+            localStorage.setItem('wiredterm-state', JSON.stringify(state));
+        } catch (e) {
+            console.warn("Failed to persist state:", e.message);
+        }
     }
 
     restoreState() {
@@ -797,10 +959,17 @@ class TabManager {
                 document.getElementById('grid-mode-btn').style.color = '#7ee787';
             }
 
+            if (state.nextId && Number.isInteger(state.nextId)) {
+                this.nextId = state.nextId;
+            }
+
             if (state.tabs && state.tabs.length > 0) {
                 state.tabs.forEach(t => {
-                    this.createTab(t.name, t.content);
+                    this.createTab(t.name, t.content, t.id, Boolean(t.isEncrypted));
                 });
+                if (state.activeId && this.tabs.has(state.activeId)) {
+                    this.setActiveTab(state.activeId);
+                }
             } else {
                 this.createTab();
             }
@@ -933,6 +1102,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     window.tabManager = new TabManager();
+
+    if (termContainer) {
+        termContainer.addEventListener('click', () => {
+            const active = window.tabManager ? window.tabManager.getActiveTab() : null;
+            if (active && active.term) active.term.focus();
+        });
+    }
+
+    window.addEventListener('focus', () => {
+        const active = window.tabManager ? window.tabManager.getActiveTab() : null;
+        if (active && active.term) active.term.focus();
+    });
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
@@ -1443,47 +1624,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2b. Security Settings
+    // 2b. Security Settings Modal
     const securityBtn = document.getElementById('security-settings-btn');
+    const securityModal = document.getElementById('security-modal');
+    const secCloseBtn = document.getElementById('security-modal-close');
+    const secCloseX = document.getElementById('security-modal-close-x');
+    const secFeedback = document.getElementById('security-feedback-msg');
+
+    const secForceStatus = document.getElementById('sec-force-e2ee-status');
+    const secForceToggle = document.getElementById('sec-force-e2ee-toggle');
+
+    const secPassStatus = document.getElementById('sec-passphrase-status');
+    const secPassToggle = document.getElementById('sec-passphrase-toggle');
+
+    const secPinStatus = document.getElementById('sec-pin-status');
+    const secPinToggle = document.getElementById('sec-pin-toggle');
+
+    let currentSettings = null;
+
+    async function refreshSecurityModal() {
+        if (!securityModal) return;
+        if (secFeedback) secFeedback.textContent = '';
+        try {
+            const resp = await fetch('/api/settings');
+            if (!resp.ok) throw new Error('Failed to load settings');
+            currentSettings = await resp.json();
+
+            // 1. Strict E2EE
+            if (secForceStatus && secForceToggle) {
+                if (currentSettings.envForceE2EE) {
+                    secForceStatus.textContent = 'LOCKED (ENV)';
+                    secForceStatus.className = 'badge badge-locked';
+                    secForceToggle.disabled = true;
+                    secForceToggle.textContent = 'Locked';
+                } else if (currentSettings.forceE2EE) {
+                    secForceStatus.textContent = 'ENABLED';
+                    secForceStatus.className = 'badge badge-enabled';
+                    secForceToggle.disabled = false;
+                    secForceToggle.textContent = 'Disable';
+                } else {
+                    secForceStatus.textContent = 'DISABLED';
+                    secForceStatus.className = 'badge badge-disabled';
+                    secForceToggle.disabled = false;
+                    secForceToggle.textContent = 'Enable';
+                }
+            }
+
+            // 2. Passphrase Fallback
+            if (secPassStatus && secPassToggle) {
+                if (!currentSettings.hasEnvPassphrase) {
+                    secPassStatus.textContent = 'NOT CONFIGURED';
+                    secPassStatus.className = 'badge badge-disabled';
+                    secPassToggle.disabled = true;
+                    secPassToggle.textContent = 'N/A';
+                } else if (currentSettings.disablePassphrase) {
+                    secPassStatus.textContent = 'DISABLED';
+                    secPassStatus.className = 'badge badge-disabled';
+                    secPassToggle.disabled = false;
+                    secPassToggle.textContent = 'Enable';
+                } else {
+                    secPassStatus.textContent = 'ENABLED';
+                    secPassStatus.className = 'badge badge-enabled';
+                    secPassToggle.disabled = false;
+                    secPassToggle.textContent = 'Disable';
+                }
+            }
+
+            // 3. PIN Login
+            if (secPinStatus && secPinToggle) {
+                if (currentSettings.envDisablePin) {
+                    secPinStatus.textContent = 'DISABLED (ENV)';
+                    secPinStatus.className = 'badge badge-locked';
+                    secPinToggle.disabled = true;
+                    secPinToggle.textContent = 'Locked';
+                } else if (currentSettings.disablePin) {
+                    secPinStatus.textContent = 'DISABLED';
+                    secPinStatus.className = 'badge badge-disabled';
+                    secPinToggle.disabled = false;
+                    secPinToggle.textContent = 'Enable';
+                } else {
+                    secPinStatus.textContent = 'ENABLED';
+                    secPinStatus.className = 'badge badge-enabled';
+                    secPinToggle.disabled = false;
+                    secPinToggle.textContent = 'Disable';
+                }
+            }
+        } catch (e) {
+            if (secFeedback) secFeedback.textContent = e.message;
+        }
+    }
+
+    async function updateSetting(payload) {
+        if (secFeedback) secFeedback.textContent = '';
+        try {
+            const csrfRes = await fetch('/api/csrf-token');
+            const { token } = await csrfRes.json();
+            const resp = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': token
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.error || 'Failed to update setting');
+            }
+            await refreshSecurityModal();
+        } catch (err) {
+            if (secFeedback) secFeedback.textContent = err.message;
+        }
+    }
+
+    if (secForceToggle) {
+        secForceToggle.addEventListener('click', () => {
+            if (!currentSettings || currentSettings.envForceE2EE) return;
+            updateSetting({ forceE2EE: !currentSettings.forceE2EE });
+        });
+    }
+
+    if (secPassToggle) {
+        secPassToggle.addEventListener('click', () => {
+            if (!currentSettings || !currentSettings.hasEnvPassphrase) return;
+            updateSetting({ disablePassphrase: !currentSettings.disablePassphrase });
+        });
+    }
+
+    if (secPinToggle) {
+        secPinToggle.addEventListener('click', () => {
+            if (!currentSettings || currentSettings.envDisablePin) return;
+            updateSetting({ disablePin: !currentSettings.disablePin });
+        });
+    }
+
+    const closeSecurityModal = () => {
+        if (securityModal && typeof securityModal.close === 'function') {
+            securityModal.close();
+        }
+    };
+    if (secCloseBtn) secCloseBtn.addEventListener('click', closeSecurityModal);
+    if (secCloseX) secCloseX.addEventListener('click', closeSecurityModal);
+
     if (securityBtn) {
         securityBtn.addEventListener('click', async () => {
-            try {
-                const resp = await fetch('/api/settings');
-                const settings = await resp.json();
-
-                if (settings.envDisablePin) {
-                    await showCustomAlert('PIN login is completely disabled via environment variable (DISABLE_PIN=true).', 'Security Settings');
-                    return;
-                }
-
-                const currentStatus = settings.disablePin ? 'DISABLED' : 'ENABLED';
-                const actionText = settings.disablePin ? 'Enable' : 'Disable';
-
-                const confirmChange = await showCustomConfirm(`PIN login is currently ${currentStatus}.\n\nDo you want to ${actionText} PIN login?`, 'Security Settings');
-                if (confirmChange) {
-                    const newStatus = !settings.disablePin;
-                    const csrfRes = await fetch('/api/csrf-token');
-                    const { token } = await csrfRes.json();
-                    await fetch('/api/settings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-csrf-token': token
-                        },
-                        body: JSON.stringify({ disablePin: newStatus })
-                    });
-                    await showCustomAlert(`PIN login is now ${newStatus ? 'DISABLED' : 'ENABLED'}.`, 'Settings Updated');
-                }
-            } catch (e) {
-                await showCustomAlert(e.message, 'Error');
+            const settingsDropdown = document.getElementById('settings-dropdown');
+            if (settingsDropdown) settingsDropdown.classList.remove('show');
+            await refreshSecurityModal();
+            if (securityModal && typeof securityModal.showModal === 'function') {
+                securityModal.showModal();
             }
         });
     }
 
-    // 3. Telemetry
-    const telemetrySocket = io();
+    // 3. Telemetry (isolated socket, does not spawn a PTY)
+    const telemetrySocket = io({ query: { type: 'telemetry' } });
     setInterval(() => {
-        telemetrySocket.emit('telemetry:request');
+        if (telemetrySocket.connected) {
+            telemetrySocket.emit('telemetry:request');
+        }
     }, 3000);
     telemetrySocket.on('telemetry:update', (data) => {
         const display = document.getElementById('telemetry-display');
@@ -1491,5 +1790,21 @@ document.addEventListener('DOMContentLoaded', () => {
             display.textContent = `~ CPU: ${data.cpu} | RAM: ${data.mem}% of ${data.totalMem}GB`;
         }
     });
-    setTimeout(() => telemetrySocket.emit('telemetry:request'), 1000);
+    setTimeout(() => {
+        if (telemetrySocket.connected) telemetrySocket.emit('telemetry:request');
+    }, 1000);
+
+    // 4. Window Visibility & Reconnection Handler
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && window.tabManager) {
+            const activeTab = window.tabManager.getActiveTab();
+            if (activeTab) {
+                activeTab.syncStatus();
+                if (activeTab.socket && !activeTab.socket.connected && !activeTab.isProcessExited) {
+                    activeTab.socket.connect();
+                }
+                activeTab.resize();
+            }
+        }
+    });
 });

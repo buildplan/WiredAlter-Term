@@ -94,7 +94,7 @@ describe('E2EE Cryptographic Primitives & Wire Framing', () => {
 describe('E2EE Handshake & Ephemeral ECDH Interoperability', () => {
   it('agrees on shared key between Node crypto.createECDH and WebCrypto crypto.subtle (P-256)', async () => {
     const salt = crypto.randomBytes(16);
-    
+
     // Server generates ECDH via Node crypto
     const { ecdh: serverEcdh, publicKey: serverEcdhPub } = createServerECDH();
     assert.equal(serverEcdhPub.length, 65);
@@ -212,7 +212,7 @@ describe('E2EE Handshake & Ephemeral ECDH Interoperability', () => {
 
     // Simulate client ECDH
     const { ecdh: clientEcdh, publicKey: clientEcdhPub } = createServerECDH();
-    
+
     // Client derives key
     const sharedSecret = clientEcdh.computeSecret(challengePayload.serverEcdhPub);
     const info = Buffer.concat([
@@ -295,7 +295,7 @@ describe('E2EE Handshake & Ephemeral ECDH Interoperability', () => {
     assert.equal(challengePayload.mode, 'passkey');
 
     // Mock startAuthentication to return a valid dummy assertion object
-    const mockStartAuth = async (optionsJSON) => {
+    const mockStartAuth = async ({ optionsJSON }) => {
       assert.ok(optionsJSON.challenge);
       return {
         id: 'test-passkey-id',
@@ -417,6 +417,68 @@ describe('WebAuthn Request Resolution Helpers (RP ID & Origin)', () => {
     };
     assert.equal(getRpID(proxyReq), 'terminal.corp.internal');
     assert.equal(getOrigin(proxyReq), 'https://terminal.corp.internal:443');
+  });
+});
+
+describe('Multiplexed C2S Opcode Framing & Concurrency', () => {
+  it('interleaves keystrokes and resizes in strict FIFO sequence without desynchronization', async () => {
+    await import('../src/public/e2ee-client.js');
+    const ClientE2EESession = globalThis.ClientE2EESession;
+
+    const serverSession = new ServerE2EESession(1000);
+    const clientSession = new ClientE2EESession();
+
+    const challenge = serverSession.initChallenge('passphrase');
+    const proof = await clientSession.completePassphraseChallenge(
+      'secret-pw',
+      challenge.salt,
+      challenge.serverNonce,
+      challenge.iterations
+    );
+    await serverSession.verifyPassphraseHandshake('secret-pw', proof);
+    clientSession.markReady();
+
+    const textEncoder = new TextEncoder();
+    const emittedBuffers = [];
+
+    // Helper to queue framed message
+    const sendFramed = (opcode, str) => {
+      const dataBytes = textEncoder.encode(str);
+      const framed = new Uint8Array(1 + dataBytes.length);
+      framed[0] = opcode;
+      framed.set(dataBytes, 1);
+      clientSession.enqueueEncryptInput(framed, (wireBuf) => {
+        emittedBuffers.push(Buffer.from(wireBuf));
+      });
+    };
+
+    // Rapidly interleave typing and resizing:
+    sendFramed(0x01, 'echo "hello ');  // seq 0 (input)
+    sendFramed(0x02, JSON.stringify({ cols: 100, rows: 30 })); // seq 1 (resize)
+    sendFramed(0x01, 'world"\n');     // seq 2 (input)
+    sendFramed(0x02, JSON.stringify({ cols: 120, rows: 40 })); // seq 3 (resize)
+    sendFramed(0x01, 'ls\n');          // seq 4 (input)
+
+    // Wait for async queue to drain
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(emittedBuffers.length, 5);
+
+    // Verify server decrypts all 5 frames in exact sequence without failure
+    const results = [];
+    for (const buf of emittedBuffers) {
+      const decrypted = serverSession.decryptInput(buf);
+      const op = decrypted[0];
+      const payload = decrypted.subarray(1).toString('utf8');
+      results.push({ op, payload });
+    }
+
+    assert.deepEqual(results, [
+      { op: 0x01, payload: 'echo "hello ' },
+      { op: 0x02, payload: '{"cols":100,"rows":30}' },
+      { op: 0x01, payload: 'world"\n' },
+      { op: 0x02, payload: '{"cols":120,"rows":40}' },
+      { op: 0x01, payload: 'ls\n' },
+    ]);
   });
 });
 

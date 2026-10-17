@@ -220,33 +220,97 @@
 
     <dialog id="e2ee-modal" class="custom-modal">
         <div class="custom-modal-content">
-            <h3 style="margin-top: 0; color: var(--text-title); display: flex; align-items: center; gap: 8px;">
-                <span>🔒</span> <span>Encrypted Session (E2EE)</span>
+            <h3 class="e2ee-modal-header">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>End-to-End Encryption (E2EE)</span>
             </h3>
-            <p style="color: var(--text-main); font-size: 0.88rem; line-height: 1.4; margin-bottom: 12px;">
-                Protect keystrokes, passwords, and terminal buffers from network inspection and TLS forward proxies.
+            <p class="e2ee-modal-desc">
+                Encrypt keystrokes, passwords, and terminal buffers to protect against TLS proxy inspection.
             </p>
 
-            <div id="e2ee-passkey-container" style="display: none; margin-top: 15px;">
-                <button id="e2ee-passkey-btn" class="icon-btn" style="width: 100%; padding: 10px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <span>📱</span> <span>Unlock with Passkey / Phone</span>
+            <div id="e2ee-passkey-container" style="display: none;">
+                <button id="e2ee-passkey-btn" class="e2ee-passkey-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                    </svg>
+                    <span>Turn on E2EE with Passkey</span>
                 </button>
             </div>
 
-            <div id="e2ee-or-divider" style="margin: 14px 0; text-align: center; color: var(--text-main); font-size: 0.78rem; display: none;">
-                — OR ENTER PASSPHRASE —
+            <div id="e2ee-or-divider" class="e2ee-divider" style="display: none;">
+                <span>or use passphrase</span>
             </div>
 
-            <div id="e2ee-passphrase-container" style="display: none; margin-top: 10px;">
-                <label for="e2ee-passphrase-input" style="display: block; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px;">Session Encryption Passphrase</label>
-                <input type="password" id="e2ee-passphrase-input" placeholder="Enter session passphrase..." style="width: 100%; box-sizing: border-box; background: var(--term-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; outline: none; font-family: inherit;" />
+            <div id="e2ee-passphrase-container" class="e2ee-input-group" style="display: none;">
+                <label for="e2ee-passphrase-input" class="e2ee-input-label">Encryption Passphrase</label>
+                <input type="password" id="e2ee-passphrase-input" class="e2ee-input" placeholder="Enter passphrase..." autocomplete="current-password" />
             </div>
 
-            <div id="e2ee-feedback-msg" style="margin-top: 10px; font-size: 0.82rem; color: #f85149; min-height: 16px;"></div>
+            <div id="e2ee-feedback-msg" class="e2ee-feedback"></div>
 
-            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
-                <button id="e2ee-modal-cancel" class="icon-btn" style="display: none;">Cancel</button>
-                <button id="e2ee-modal-submit" class="icon-btn" style="background: var(--text-title); color: #fff; border-color: var(--text-title); display: none;">Unlock</button>
+            <div class="e2ee-modal-actions">
+                <button id="e2ee-modal-cancel" class="icon-btn" style="display: none;" type="button">Cancel</button>
+                <button id="e2ee-modal-submit" class="e2ee-submit-btn" style="display: none;" type="button">Turn on E2EE</button>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="security-modal" class="custom-modal security-modal">
+        <div class="custom-modal-content">
+            <div class="security-modal-header">
+                <h3 style="margin: 0; color: var(--text-title); display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Security Settings</span>
+                </h3>
+                <button id="security-modal-close-x" class="modal-close-btn" type="button" title="Close">✕</button>
+            </div>
+            
+            <p style="color: var(--text-muted); font-size: 0.83rem; margin: 8px 0 16px 0; line-height: 1.4;">
+                Configure authentication methods and encryption enforcement for all sessions.
+            </p>
+
+            <div class="security-setting-row">
+                <div class="security-setting-info">
+                    <div class="security-setting-title">Strict E2EE Enforcement</div>
+                    <div class="security-setting-desc">Require E2EE on all tabs (delays shell spawn until verified)</div>
+                </div>
+                <div class="security-setting-action">
+                    <span id="sec-force-e2ee-status" class="badge">...</span>
+                    <button id="sec-force-e2ee-toggle" class="icon-btn setting-toggle-btn" type="button">Toggle</button>
+                </div>
+            </div>
+
+            <div class="security-setting-row">
+                <div class="security-setting-info">
+                    <div class="security-setting-title">E2EE Passphrase Fallback</div>
+                    <div class="security-setting-desc">Allow pre-shared passphrase when passkeys are unavailable</div>
+                </div>
+                <div class="security-setting-action">
+                    <span id="sec-passphrase-status" class="badge">...</span>
+                    <button id="sec-passphrase-toggle" class="icon-btn setting-toggle-btn" type="button">Toggle</button>
+                </div>
+            </div>
+
+            <div class="security-setting-row">
+                <div class="security-setting-info">
+                    <div class="security-setting-title">PIN Login</div>
+                    <div class="security-setting-desc">Allow logging in with numeric PIN (recommended: passkeys only)</div>
+                </div>
+                <div class="security-setting-action">
+                    <span id="sec-pin-status" class="badge">...</span>
+                    <button id="sec-pin-toggle" class="icon-btn setting-toggle-btn" type="button">Toggle</button>
+                </div>
+            </div>
+
+            <div id="security-feedback-msg" class="e2ee-feedback"></div>
+
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                <button id="security-modal-close" class="icon-btn" style="padding: 6px 16px;" type="button">Done</button>
             </div>
         </div>
     </dialog>
