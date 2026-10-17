@@ -275,7 +275,7 @@
       };
 
       // 3. Prompt Phone Passkey (QR / Bluetooth) or Hardware Security Key
-      const webauthnAssertion = await startAuthentication(optionsJSON);
+      const webauthnAssertion = await startAuthentication({ optionsJSON });
 
       // 4. Import server's 65-byte uncompressed P-256 public key & compute ECDH shared secret
       const serverPubKey = await cryptoObj.subtle.importKey(

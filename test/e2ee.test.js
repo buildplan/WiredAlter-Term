@@ -295,7 +295,7 @@ describe('E2EE Handshake & Ephemeral ECDH Interoperability', () => {
     assert.equal(challengePayload.mode, 'passkey');
 
     // Mock startAuthentication to return a valid dummy assertion object
-    const mockStartAuth = async (optionsJSON) => {
+    const mockStartAuth = async ({ optionsJSON }) => {
       assert.ok(optionsJSON.challenge);
       return {
         id: 'test-passkey-id',

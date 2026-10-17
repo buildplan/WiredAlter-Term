@@ -70,6 +70,8 @@ function updateE2EEUI(isEncrypted) {
 }
 
 let pendingE2EEPrompt = null;
+// Browsers allow one WebAuthn ceremony at a time; concurrent tabs would abort each other.
+let passkeyCeremonyQueue = Promise.resolve();
 
 function promptE2EE(status = serverE2EEStatus, errorMsg = '') {
     if (cachedSessionPassphrase && !errorMsg) {
@@ -515,10 +517,12 @@ class TerminalTab {
                     if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.startAuthentication) {
                         throw new Error("WebAuthn library not loaded. Try refreshing.");
                     }
-                    const assertionResult = await this.e2ee.completePasskeyChallenge(
+                    const ceremony = passkeyCeremonyQueue.then(() => this.e2ee.completePasskeyChallenge(
                         challengePayload,
                         window.SimpleWebAuthnBrowser.startAuthentication
-                    );
+                    ));
+                    passkeyCeremonyQueue = ceremony.catch(() => {});
+                    const assertionResult = await ceremony;
                     this.socket.emit('e2ee:verify', assertionResult);
                 } else {
                     const passphrase = this._pendingPassphrase || cachedSessionPassphrase;
