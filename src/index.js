@@ -742,13 +742,23 @@ io.on('connection', (socket) => {
         });
     };
 
-    const triggerTerminalRedraw = (proc, cols, rows) => {
-        if (!proc) return;
+    // The client's latest size wins over the size captured in the handshake query.
+    const resizePty = (proc, cols, rows) => {
         const safeCols = Math.max(1, Math.min(1000, cols || 80));
         const safeRows = Math.max(1, Math.min(1000, rows || 30));
+        if (sessionObj) { sessionObj.cols = safeCols; sessionObj.rows = safeRows; }
+        proc.resize(safeCols, safeRows);
+    };
+
+    const triggerTerminalRedraw = (proc, cols, rows) => {
+        if (!proc) return;
+        const safeCols = Math.max(1, Math.min(1000, sessionObj?.cols || cols || 80));
+        const safeRows = Math.max(1, Math.min(1000, sessionObj?.rows || rows || 30));
         try { proc.resize(safeCols, safeRows + 1); } catch (e) {}
         setTimeout(() => {
-            try { proc.resize(safeCols, safeRows); } catch (e) {}
+            const finalCols = sessionObj?.cols || safeCols;
+            const finalRows = sessionObj?.rows || safeRows;
+            try { proc.resize(finalCols, finalRows); } catch (e) {}
         }, 40);
         exec(`tmux refresh-client -t "tab-${tabId}" 2>/dev/null`, () => {});
     };
@@ -973,9 +983,7 @@ io.on('connection', (socket) => {
                 // Opcode 0x02: Terminal resize
                 try {
                     const { cols, rows } = JSON.parse(plaintextBuf.subarray(1).toString('utf8'));
-                    const safeCols = Math.max(1, Math.min(1000, cols || 80));
-                    const safeRows = Math.max(1, Math.min(1000, rows || 30));
-                    proc.resize(safeCols, safeRows);
+                    resizePty(proc, cols, rows);
                 } catch (err) {
                     console.warn(`[Tab ${tabId}] Failed to parse resize payload:`, err.message);
                 }
@@ -985,7 +993,7 @@ io.on('connection', (socket) => {
                 try {
                     const parsed = JSON.parse(str);
                     if (parsed.cols && parsed.rows) {
-                        proc.resize(Math.max(1, Math.min(1000, parsed.cols)), Math.max(1, Math.min(1000, parsed.rows)));
+                        resizePty(proc, parsed.cols, parsed.rows);
                         return;
                     }
                 } catch (e) {}
@@ -1007,9 +1015,7 @@ io.on('connection', (socket) => {
                 ? plaintextBuf.subarray(1).toString('utf8')
                 : plaintextBuf.toString('utf8');
             const { cols, rows } = JSON.parse(raw);
-            const safeCols = Math.max(1, Math.min(1000, cols || 80));
-            const safeRows = Math.max(1, Math.min(1000, rows || 30));
-            proc.resize(safeCols, safeRows);
+            resizePty(proc, cols, rows);
         } catch (err) {
             console.error(`[Tab ${tabId}] Failed to decrypt terminal resize:`, err.message);
             socket.disconnect(true);
@@ -1033,9 +1039,7 @@ io.on('connection', (socket) => {
         const proc = sessionObj?.ptyProcess;
         if (isForceE2EE() || sessionObj?.isEncrypted || e2ee.isVerified) return;
         if (!proc) return;
-        const safeCols = Math.max(1, Math.min(1000, cols || 80));
-        const safeRows = Math.max(1, Math.min(1000, rows || 30));
-        try { proc.resize(safeCols, safeRows); }
+        try { resizePty(proc, cols, rows); }
         catch (err) { console.warn(`[Tab ${tabId}] Resize failed:`, err.message); }
     });
 
