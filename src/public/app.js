@@ -488,7 +488,7 @@ class TerminalTab {
                 updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
             if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
-                this.initiateE2EE(status);
+                if (this.isActive()) this.initiateE2EE(status);
             } else if (!status.forceE2EE && !this.wasEncrypted) {
                 if (this.element) this.element.classList.remove('e2ee-shielded');
                 const container = document.getElementById('terminals-container');
@@ -737,6 +737,10 @@ class TerminalTab {
         this.syncStatus();
         this.startLatencyCheck();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
+        if (this.socket && this.socket.connected && serverE2EEStatus
+            && (this.wasEncrypted || serverE2EEStatus.forceE2EE) && !(this.e2ee && this.e2ee.isReady)) {
+            this.initiateE2EE();
+        }
         if (this.socket && !this.socket.connected && !this.isProcessExited) {
             this.socket.connect();
         }
