@@ -312,6 +312,7 @@ class TerminalTab {
             allowTransparency: true,
             theme: themes[currentTheme],
             scrollback: 5000,
+            allowProposedApi: true,
             allowMouseReporting: mouseReportingEnabled
         });
 
