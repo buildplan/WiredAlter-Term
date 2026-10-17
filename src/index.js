@@ -844,7 +844,13 @@ io.on('connection', (socket) => {
 
     // --- E2EE Handshake Handlers ---
     socket.on('e2ee:init', async (data) => {
+        if (e2ee.isVerified) return;
         const mode = data?.mode || (hasPasskeys ? 'passkey' : 'passphrase');
+        // Re-issuing would rotate the ECDH key and invalidate the in-flight response.
+        if (e2ee.challengeMode === mode && e2ee.challengePromise) {
+            try { socket.emit('e2ee:challenge', await e2ee.challengePromise); } catch (err) { /* reported by the first init */ }
+            return;
+        }
         if (mode === 'passkey') {
             if (!hasPasskeys) {
                 socket.emit('e2ee:error', 'No passkeys registered in database');
@@ -852,14 +858,16 @@ io.on('connection', (socket) => {
             }
             try {
                 const passkeys = db.prepare('SELECT id FROM passkeys').all();
-                const webauthnOptions = await generateAuthenticationOptions({
+                e2ee.challengeMode = 'passkey';
+                e2ee.challengePromise = generateAuthenticationOptions({
                     rpID: getRpID(req),
                     allowCredentials: passkeys.map(pk => ({ id: pk.id, type: 'public-key' })),
                     userVerification: 'preferred',
-                });
-                const challengePayload = e2ee.initChallenge('passkey', webauthnOptions);
-                socket.emit('e2ee:challenge', challengePayload);
+                }).then((webauthnOptions) => e2ee.initChallenge('passkey', webauthnOptions));
+                socket.emit('e2ee:challenge', await e2ee.challengePromise);
             } catch (err) {
+                e2ee.challengeMode = null;
+                e2ee.challengePromise = null;
                 socket.emit('e2ee:error', err.message);
             }
         } else {
@@ -868,13 +876,20 @@ io.on('connection', (socket) => {
                 socket.emit('e2ee:error', 'Server has no active E2EE passphrase configured');
                 return;
             }
-            const challengePayload = e2ee.initChallenge('passphrase');
-            socket.emit('e2ee:challenge', challengePayload);
+            e2ee.challengeMode = 'passphrase';
+            e2ee.challengePromise = Promise.resolve(e2ee.initChallenge('passphrase'));
+            socket.emit('e2ee:challenge', await e2ee.challengePromise);
         }
     });
 
     socket.on('e2ee:verify', async (data) => {
         if (!data) return;
+        // A duplicate verify after success (handshake secrets are wiped) must not be treated as a failure.
+        if (e2ee.isVerified) return;
+        if (!e2ee.challengePromise || (data.mode === 'passkey') !== (e2ee.challengeMode === 'passkey')) {
+            socket.emit('e2ee:error', 'E2EE handshake not initialised');
+            return;
+        }
         try {
             if (data.mode === 'passkey') {
                 const { clientEcdhPub, webauthnAssertion, encryptedProof } = data;
