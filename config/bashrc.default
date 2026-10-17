@@ -109,10 +109,10 @@ alias ports='nc -vz'
 if command -v tmux >/dev/null 2>&1 && [ -z "$TMUX" ]; then
     if [ ! -f "$HOME/.notmux" ]; then 
         SESSION_NAME="tab-${WIRED_TAB_ID:-main}"
-        exec tmux new-session -A -s "$SESSION_NAME"
+        tmux new-session -A -s "$SESSION_NAME"
     fi
 fi
 
 # --- TMUX TOGGLE ALIASES ---
 alias tmux-off="touch ~/.notmux && clear && echo '❌ Tmux auto-start disabled. Type \"exit\" to close this session, then click New Tab (+).'"
-alias tmux-on="rm -f ~/.notmux && clear && if [ -z \"\$TMUX\" ]; then SESSION_NAME=\"tab-\${WIRED_TAB_ID:-main}\"; exec tmux new-session -A -s \"\$SESSION_NAME\"; else echo '✅ Tmux auto-start enabled.'; fi"
+alias tmux-on="rm -f ~/.notmux && clear && if [ -z \"\$TMUX\" ]; then SESSION_NAME=\"tab-\${WIRED_TAB_ID:-main}\"; tmux new-session -A -s \"\$SESSION_NAME\"; else echo '✅ Tmux auto-start enabled.'; fi"

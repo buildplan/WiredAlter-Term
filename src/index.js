@@ -641,17 +641,17 @@ const setupPersistence = () => {
         try {
             let bc = fs.readFileSync(bashrcPath, 'utf8');
             let mod = false;
-            if (bc.includes('    tmux new-session -A -s "$SESSION_NAME"')) {
-                bc = bc.replace('    tmux new-session -A -s "$SESSION_NAME"', '    exec tmux new-session -A -s "$SESSION_NAME"');
+            if (bc.includes('    exec tmux new-session -A -s "$SESSION_NAME"')) {
+                bc = bc.replace('    exec tmux new-session -A -s "$SESSION_NAME"', '    tmux new-session -A -s "$SESSION_NAME"');
                 mod = true;
             }
-            if (bc.includes('; tmux new-session -A -s "$SESSION_NAME"')) {
-                bc = bc.replace('; tmux new-session -A -s "$SESSION_NAME"', '; exec tmux new-session -A -s "$SESSION_NAME"');
+            if (bc.includes('; exec tmux new-session -A -s "$SESSION_NAME"')) {
+                bc = bc.replace('; exec tmux new-session -A -s "$SESSION_NAME"', '; tmux new-session -A -s "$SESSION_NAME"');
                 mod = true;
             }
             if (mod) {
                 fs.writeFileSync(bashrcPath, bc, 'utf8');
-                console.log('   🛠️  Migrated persistent .bashrc (added exec to tmux auto-start)');
+                console.log('   🛠️  Migrated persistent .bashrc (restored non-exec tmux auto-start for fallback shells)');
             }
         } catch (e) {
             console.warn('   ⚠️  Could not migrate .bashrc:', e.message);
