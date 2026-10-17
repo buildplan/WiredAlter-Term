@@ -522,31 +522,38 @@ class TerminalTab {
         });
 
         this.socket.on('e2ee:challenge', async (challengePayload) => {
-            // A late challenge would re-key a live session and desync sequence numbers.
             if (this.e2ee && this.e2ee.isReady) return;
+            const session = this.e2ee;
+            const isStale = () => this.e2ee !== session;
             try {
                 if (challengePayload.mode === 'passkey') {
                     if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.startAuthentication) {
                         throw new Error("WebAuthn library not loaded. Try refreshing.");
                     }
-                    const ceremony = passkeyCeremonyQueue.then(() => this.e2ee.completePasskeyChallenge(
-                        challengePayload,
-                        window.SimpleWebAuthnBrowser.startAuthentication
-                    ));
+                    const ceremony = passkeyCeremonyQueue.then(() => {
+                        if (isStale()) return null;
+                        return session.completePasskeyChallenge(
+                            challengePayload,
+                            window.SimpleWebAuthnBrowser.startAuthentication
+                        );
+                    });
                     passkeyCeremonyQueue = ceremony.catch(() => {});
                     const assertionResult = await ceremony;
+                    if (!assertionResult || isStale()) return;
                     this.socket.emit('e2ee:verify', assertionResult);
                 } else {
                     const passphrase = this._pendingPassphrase || cachedSessionPassphrase;
-                    const encryptedProof = await this.e2ee.completePassphraseChallenge(
+                    const encryptedProof = await session.completePassphraseChallenge(
                         passphrase,
                         challengePayload.salt,
                         challengePayload.serverNonce,
                         challengePayload.iterations
                     );
+                    if (isStale()) return;
                     this.socket.emit('e2ee:verify', { mode: 'passphrase', encryptedProof });
                 }
             } catch (err) {
+                if (isStale()) return;
                 console.error("E2EE Challenge completion error:", err);
                 this._e2eeInFlight = false;
                 const msg = err.name === 'NotAllowedError'
