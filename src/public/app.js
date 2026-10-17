@@ -69,11 +69,20 @@ function updateE2EEUI(isEncrypted) {
     }
 }
 
+let pendingE2EEPrompt = null;
+
 function promptE2EE(status = serverE2EEStatus) {
+    if (cachedSessionPassphrase) {
+        return Promise.resolve({ mode: 'passphrase', passphrase: cachedSessionPassphrase });
+    }
+    // The modal is shared by all tabs; every waiting tab must get the same answer.
+    if (pendingE2EEPrompt) return pendingE2EEPrompt;
+    pendingE2EEPrompt = promptE2EEModal(status).finally(() => { pendingE2EEPrompt = null; });
+    return pendingE2EEPrompt;
+}
+
+function promptE2EEModal(status) {
     return new Promise((resolve, reject) => {
-        if (cachedSessionPassphrase) {
-            return resolve({ mode: 'passphrase', passphrase: cachedSessionPassphrase });
-        }
 
         const container = document.getElementById('terminals-container');
         if (container) container.classList.add('e2ee-shielded');
@@ -453,8 +462,11 @@ class TerminalTab {
 
     async initiateE2EE(status = serverE2EEStatus) {
         if (this.e2ee && this.e2ee.isReady) return;
+        if (this._e2eeInFlight) return;
+        this._e2eeInFlight = true;
         try {
             const choice = await promptE2EE(status);
+            if (this.e2ee && this.e2ee.isReady) { this._e2eeInFlight = false; return; }
             if (choice.mode === 'passkey') {
                 this.socket.emit('e2ee:init', { mode: 'passkey' });
             } else {
@@ -462,6 +474,7 @@ class TerminalTab {
                 this.socket.emit('e2ee:init', { mode: 'passphrase' });
             }
         } catch (err) {
+            this._e2eeInFlight = false;
             console.warn("E2EE unlock cancelled:", err);
         }
     }
@@ -495,6 +508,8 @@ class TerminalTab {
         });
 
         this.socket.on('e2ee:challenge', async (challengePayload) => {
+            // A late challenge would re-key a live session and desync sequence numbers.
+            if (this.e2ee && this.e2ee.isReady) return;
             try {
                 if (challengePayload.mode === 'passkey') {
                     if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.startAuthentication) {
@@ -517,6 +532,7 @@ class TerminalTab {
                 }
             } catch (err) {
                 console.error("E2EE Challenge completion error:", err);
+                this._e2eeInFlight = false;
                 if (e2eeFeedbackMsg) {
                     const msg = err.name === 'NotAllowedError'
                         ? 'Passkey was cancelled or timed out. Try again.'
@@ -530,6 +546,7 @@ class TerminalTab {
         });
 
         this.socket.on('e2ee:ready', (data) => {
+            this._e2eeInFlight = false;
             this.e2ee.markReady();
             this.wasEncrypted = true;
             if (this.tabElement) {
@@ -553,6 +570,7 @@ class TerminalTab {
 
         this.socket.on('e2ee:error', (msg) => {
             console.error("E2EE Error from server:", msg);
+            this._e2eeInFlight = false;
             if (e2eeFeedbackMsg) {
                 e2eeFeedbackMsg.textContent = msg;
                 if (e2eeModal && !e2eeModal.open && typeof e2eeModal.showModal === 'function') {
@@ -568,6 +586,7 @@ class TerminalTab {
 
         this.socket.on('connect', () => {
             this.isProcessExited = false;
+            this._e2eeInFlight = false;
             // On fresh connection, re-instantiate client E2EE session for fresh keys
             this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
             this.syncStatus();
