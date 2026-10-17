@@ -157,6 +157,13 @@ if (e2eePassphraseInput) {
         }
     });
 }
+if (e2eeModal) {
+    // Escape would close the dialog without settling the pending prompt and wedge every tab.
+    e2eeModal.addEventListener('cancel', (e) => {
+        e.preventDefault();
+        if (!serverE2EEStatus?.forceE2EE && e2eeModalCancel) e2eeModalCancel.click();
+    });
+}
 if (e2eeModalCancel) {
     e2eeModalCancel.addEventListener('click', () => {
         if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
@@ -489,7 +496,11 @@ class TerminalTab {
                 updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
             if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
-                if (this.isActive()) this.initiateE2EE(status);
+                if (this.isActive()) {
+                    const notice = this._e2eeNotice || '';
+                    this._e2eeNotice = null;
+                    this.initiateE2EE(status, notice);
+                }
             } else if (!status.forceE2EE && !this.wasEncrypted) {
                 if (this.element) this.element.classList.remove('e2ee-shielded');
                 const container = document.getElementById('terminals-container');
@@ -548,6 +559,7 @@ class TerminalTab {
 
         this.socket.on('e2ee:ready', (data) => {
             this._e2eeInFlight = false;
+            this._e2eeNotice = null;
             this.e2ee.markReady();
             this.wasEncrypted = true;
             if (this.tabElement) {
@@ -573,7 +585,13 @@ class TerminalTab {
             console.error("E2EE Error from server:", msg);
             this._e2eeInFlight = false;
             cachedSessionPassphrase = null;
-            this.initiateE2EE(serverE2EEStatus, msg);
+            // Fatal errors make the server drop the socket; the reconnect's status event shows the prompt.
+            this._e2eeNotice = msg;
+            setTimeout(() => {
+                if (this._e2eeNotice && this.socket?.connected && !this._e2eeInFlight && !(this.e2ee && this.e2ee.isReady)) {
+                    this.initiateE2EE(serverE2EEStatus, this._e2eeNotice);
+                }
+            }, 2500);
         });
 
         this.socket.on('terminal:exit', ({ code }) => {
