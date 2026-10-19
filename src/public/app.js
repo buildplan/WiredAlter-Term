@@ -283,6 +283,8 @@ async function waitForFonts() {
     }
 }
 
+let applyMobileModifiers = (payload) => payload;
+
 // --- TERMINAL TAB CLASS ---
 class TerminalTab {
     constructor(id, manager, name = null, savedContent = '', isEncrypted = false) {
@@ -427,20 +429,7 @@ class TerminalTab {
                 }
                 return;
             }
-            if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
-                if (this.e2ee && this.e2ee.isReady) {
-                    const dataBytes = new TextEncoder().encode(data);
-                    const framed = new Uint8Array(1 + dataBytes.length);
-                    framed[0] = 0x01; // OP_INPUT
-                    framed.set(dataBytes, 1);
-                    this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
-                        this.socket.emit('terminal:input:enc', wireBuf);
-                    });
-                }
-                // Never emit plaintext if this tab was encrypted!
-                return;
-            }
-            this.socket.emit('terminal:input', data);
+            this.sendInput(data);
         });
 
         // Initial Resize Request
@@ -453,6 +442,26 @@ class TerminalTab {
             }
         });
         this.resizeObserver.observe(document.getElementById('terminals-container'));
+    }
+
+    sendInput(data) {
+        if (!data || !this.socket) return;
+        data = applyMobileModifiers(data);
+        if (data === null) return;
+        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+            if (this.e2ee && this.e2ee.isReady) {
+                const dataBytes = new TextEncoder().encode(data);
+                const framed = new Uint8Array(1 + dataBytes.length);
+                framed[0] = 0x01; // OP_INPUT
+                framed.set(dataBytes, 1);
+                this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                    this.socket.emit('terminal:input:enc', wireBuf);
+                });
+            }
+            // Never emit plaintext if this tab was encrypted!
+            return;
+        }
+        this.socket.emit('terminal:input', data);
     }
 
     handleOutputData(data) {
@@ -798,12 +807,12 @@ class TerminalTab {
         clearInterval(this.pingInterval);
     }
 
-    resize() {
+    resize(force = false) {
         try {
             this.fitAddon.fit();
             const cols = this.term.cols || 80;
             const rows = this.term.rows || 30;
-            if (this._lastCols === cols && this._lastRows === rows) return;
+            if (!force && this._lastCols === cols && this._lastRows === rows) return;
             this._lastCols = cols;
             this._lastRows = rows;
 
@@ -1061,10 +1070,12 @@ class TabManager {
                     body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
-                activeTab.socket.emit('terminal:input', '\r');
+                const fileList = Array.from(files).map(f => f.name || 'unknown_file').join(', ');
+                activeTab.term.write(`\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
+                activeTab.sendInput('\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
-                activeTab.socket.emit('terminal:input', '\r');
+                activeTab.sendInput('\r');
             }
         });
     }
@@ -1085,13 +1096,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (window.tabManager) {
                 window.tabManager.tabs.forEach(tab => {
                     setTimeout(() => {
-                        tab.fitAddon.fit();
-                        if (tab.socket && tab.socket.connected) {
-                            tab.socket.emit('terminal:resize', {
-                                cols: tab.term.cols,
-                                rows: tab.term.rows
-                            });
-                        }
+                        tab.resize(true);
                     }, 50);
                 });
                 const active = window.tabManager.getActiveTab();
@@ -1319,8 +1324,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (activeTab) activeTab.term.focus();
                 return;
             }
-            if (mKeyMap[keyType] && activeTab && activeTab.socket) {
-                activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
+            if (mKeyMap[keyType] && activeTab) {
+                activeTab.sendInput(mKeyMap[keyType]);
                 activeTab.term.focus();
             }
         };
@@ -1328,79 +1333,76 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.addEventListener('click', triggerAction);
     });
 
-    // Intercept actual typing to apply the Ctrl/Alt modifiers
-    if (window.tabManager) {
-        const originalEmit = io.Socket.prototype.emit;
-        io.Socket.prototype.emit = function (eventName, payload) {
-            if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
-                const charLower = payload.toLowerCase();
+    // Apply Ctrl/Alt modifiers inside TerminalTab.prototype.sendInput before encryption
+    applyMobileModifiers = function (payload) {
+        if ((mobileCtrlActive || mobileAltActive) && payload.length === 1) {
+            const charLower = payload.toLowerCase();
 
-                // --- LOCAL APP SHORTCUTS (Ctrl + Alt) ---
-                if (mobileCtrlActive && mobileAltActive) {
-                    let shortcutTriggered = false;
+            // --- LOCAL APP SHORTCUTS (Ctrl + Alt) ---
+            if (mobileCtrlActive && mobileAltActive) {
+                let shortcutTriggered = false;
 
-                    if (charLower === 't') { if (window.tabManager) window.tabManager.createTab(); shortcutTriggered = true; }
-                    else if (charLower === 'x') { if (window.tabManager && window.tabManager.activeTabId) window.tabManager.closeTab(window.tabManager.activeTabId); shortcutTriggered = true; }
-                    else if (charLower === 'g') { const btn = document.getElementById('grid-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'm') { const btn = document.getElementById('mouse-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'l') { const btn = document.getElementById('theme-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'f') {
-                        const searchBar = document.getElementById('search-bar');
-                        const searchInput = document.getElementById('search-input');
-                        if (searchBar && searchInput) {
-                            searchBar.classList.remove('hidden');
-                            searchInput.focus();
-                            searchInput.select();
-                        }
-                        shortcutTriggered = true;
+                if (charLower === 't') { if (window.tabManager) window.tabManager.createTab(); shortcutTriggered = true; }
+                else if (charLower === 'x') { if (window.tabManager && window.tabManager.activeTabId) window.tabManager.closeTab(window.tabManager.activeTabId); shortcutTriggered = true; }
+                else if (charLower === 'g') { const btn = document.getElementById('grid-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                else if (charLower === 'm') { const btn = document.getElementById('mouse-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                else if (charLower === 'l') { const btn = document.getElementById('theme-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+                else if (charLower === 'f') {
+                    const searchBar = document.getElementById('search-bar');
+                    const searchInput = document.getElementById('search-input');
+                    if (searchBar && searchInput) {
+                        searchBar.classList.remove('hidden');
+                        searchInput.focus();
+                        searchInput.select();
                     }
-                    else if (payload === '[' || payload === ']') {
-                        const tabElements = Array.from(document.querySelectorAll('.tab'));
-                        const activeTabEl = document.querySelector('.tab.active');
-                        if (tabElements.length > 1 && activeTabEl) {
-                            const currentIndex = tabElements.indexOf(activeTabEl);
-                            const nextIndex = payload === '['
-                                ? (currentIndex - 1 + tabElements.length) % tabElements.length
-                                : (currentIndex + 1) % tabElements.length;
-                            tabElements[nextIndex].click();
-                        }
-                        shortcutTriggered = true;
-                    }
-                    if (shortcutTriggered) {
-                        mobileCtrlActive = false;
-                        mobileAltActive = false;
-                        mCtrlBtn.classList.remove('active-toggle');
-                        mAltBtn.classList.remove('active-toggle');
-                        return;
-                    }
+                    shortcutTriggered = true;
                 }
-
-                // --- STANDARD TERMINAL MODIFIERS ---
-                let modifiedPayload = payload;
-                const charCode = payload.charCodeAt(0);
-                if (mobileCtrlActive) {
-                    if (charCode >= 97 && charCode <= 122) {
-                        modifiedPayload = String.fromCharCode(charCode - 96);
+                else if (payload === '[' || payload === ']') {
+                    const tabElements = Array.from(document.querySelectorAll('.tab'));
+                    const activeTabEl = document.querySelector('.tab.active');
+                    if (tabElements.length > 1 && activeTabEl) {
+                        const currentIndex = tabElements.indexOf(activeTabEl);
+                        const nextIndex = payload === '['
+                            ? (currentIndex - 1 + tabElements.length) % tabElements.length
+                            : (currentIndex + 1) % tabElements.length;
+                        tabElements[nextIndex].click();
                     }
-                    else if (charCode >= 65 && charCode <= 90) {
-                        modifiedPayload = String.fromCharCode(charCode - 64);
-                    }
-                    else if (payload === ' ') {
-                        modifiedPayload = '\x00';
-                    }
+                    shortcutTriggered = true;
+                }
+                if (shortcutTriggered) {
                     mobileCtrlActive = false;
-                    mCtrlBtn.classList.remove('active-toggle');
-                }
-                if (mobileAltActive) {
-                    modifiedPayload = '\x1b' + modifiedPayload;
                     mobileAltActive = false;
+                    mCtrlBtn.classList.remove('active-toggle');
                     mAltBtn.classList.remove('active-toggle');
+                    return null;
                 }
-                return originalEmit.call(this, eventName, modifiedPayload);
             }
-            return originalEmit.apply(this, arguments);
-        };
-    }
+
+            // --- STANDARD TERMINAL MODIFIERS ---
+            let modifiedPayload = payload;
+            const charCode = payload.charCodeAt(0);
+            if (mobileCtrlActive) {
+                if (charCode >= 97 && charCode <= 122) {
+                    modifiedPayload = String.fromCharCode(charCode - 96);
+                }
+                else if (charCode >= 65 && charCode <= 90) {
+                    modifiedPayload = String.fromCharCode(charCode - 64);
+                }
+                else if (payload === ' ') {
+                    modifiedPayload = '\x00';
+                }
+                mobileCtrlActive = false;
+                mCtrlBtn.classList.remove('active-toggle');
+            }
+            if (mobileAltActive) {
+                modifiedPayload = '\x1b' + modifiedPayload;
+                mobileAltActive = false;
+                mAltBtn.classList.remove('active-toggle');
+            }
+            return modifiedPayload;
+        }
+        return payload;
+    };
 });
 
 // --- Passkey, Download, and Telemetry Logic ---
@@ -1564,10 +1566,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
-                activeTab.socket.emit('terminal:input', '\r');
+                const fileList = Array.from(files).map(f => f.name || 'unknown_file').join(', ');
+                activeTab.term.write(`\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
+                activeTab.sendInput('\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
-                activeTab.socket.emit('terminal:input', '\r');
+                activeTab.sendInput('\r');
             }
 
             // Clear the input so the same file can be uploaded again if needed
