@@ -480,11 +480,60 @@ describe('Multiplexed C2S Opcode Framing & Concurrency', () => {
       { op: 0x01, payload: 'ls\n' },
     ]);
   });
+});
 
-  it('routes mobile modifiers, virtual keys, post-upload CR, and forced grid resize exclusively over E2EE when encrypted', async () => {
+describe('TerminalTab encrypted input routing (app.js)', () => {
+  const loadApp = async () => {
     await import('../src/public/e2ee-client.js');
-    const ClientE2EESession = globalThis.ClientE2EESession;
+    const vm = await import('node:vm');
+    const fs = await import('node:fs');
+    const stub = () => new Proxy(function () {}, {
+      get: (_t, p) => (p === Symbol.toPrimitive ? () => '' : stub()),
+      apply: () => stub(),
+      construct: () => stub(),
+    });
+    const sandbox = {
+      document: {
+        getElementById: () => stub(),
+        documentElement: stub(),
+        body: stub(),
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener() {},
+      },
+      window: { tabManager: null, addEventListener() {} },
+      localStorage: { getItem: () => null, setItem() {} },
+      TextEncoder,
+      Uint8Array,
+      console,
+      setTimeout,
+      clearInterval,
+      setInterval,
+      io: stub(),
+    };
+    const ctx = vm.createContext(sandbox);
+    const src = fs.readFileSync(new URL('../src/public/app.js', import.meta.url), 'utf8');
+    vm.runInContext(
+      `${src}\n;globalThis.__T = TerminalTab; globalThis.__setCtrl = (v) => { mobileCtrlActive = v; }; globalThis.__getCtrl = () => mobileCtrlActive;`,
+      ctx
+    );
+    return ctx;
+  };
 
+  const makeTab = (ctx, e2eeSession) => {
+    const events = [];
+    const tab = Object.create(ctx.__T.prototype);
+    tab.wasEncrypted = true;
+    tab.socket = { connected: true, emit: (name, payload) => events.push([name, payload]) };
+    tab.e2ee = e2eeSession;
+    tab.fitAddon = { fit() {} };
+    tab.term = { cols: 100, rows: 40 };
+    return { tab, events };
+  };
+
+  it('routes input, resize, mobile keys and post-upload newline only via terminal:input:enc', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
     const serverSession = new ServerE2EESession(1000);
     const clientSession = new ClientE2EESession();
 
@@ -498,114 +547,55 @@ describe('Multiplexed C2S Opcode Framing & Concurrency', () => {
     await serverSession.verifyPassphraseHandshake('corp-passphrase', proof);
     clientSession.markReady();
 
-    let mobileCtrlActive = false;
-    let mobileAltActive = false;
-    const applyMobileModifiers = (payload) => {
-      if ((mobileCtrlActive || mobileAltActive) && payload.length === 1) {
-        let modifiedPayload = payload;
-        const charCode = payload.charCodeAt(0);
-        if (mobileCtrlActive) {
-          if (charCode >= 97 && charCode <= 122) modifiedPayload = String.fromCharCode(charCode - 96);
-          else if (charCode >= 65 && charCode <= 90) modifiedPayload = String.fromCharCode(charCode - 64);
-          else if (payload === ' ') modifiedPayload = '\x00';
-          mobileCtrlActive = false;
-        }
-        if (mobileAltActive) {
-          modifiedPayload = '\x1b' + modifiedPayload;
-          mobileAltActive = false;
-        }
-        return modifiedPayload;
-      }
-      return payload;
-    };
+    const { tab, events } = makeTab(ctx, clientSession);
 
-    const emittedEvents = [];
-    const mockTab = {
-      wasEncrypted: true,
-      e2ee: clientSession,
-      term: { cols: 80, rows: 24 },
-      fitAddon: { fit() {} },
-      _lastCols: 80,
-      _lastRows: 24,
-      socket: {
-        connected: true,
-        emit(event, payload) {
-          emittedEvents.push({ event, payload });
-        },
-      },
-      sendInput(data) {
-        if (!data || !this.socket) return;
-        data = applyMobileModifiers(data);
-        if (data === null) return;
-        if (this.wasEncrypted) {
-          if (this.e2ee && this.e2ee.isReady) {
-            const dataBytes = new TextEncoder().encode(data);
-            const framed = new Uint8Array(1 + dataBytes.length);
-            framed[0] = 0x01;
-            framed.set(dataBytes, 1);
-            this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
-              this.socket.emit('terminal:input:enc', Buffer.from(wireBuf));
-            });
-          }
-          return;
-        }
-        this.socket.emit('terminal:input', data);
-      },
-      resize(force = false) {
-        this.fitAddon.fit();
-        const cols = this.term.cols || 80;
-        const rows = this.term.rows || 30;
-        if (!force && this._lastCols === cols && this._lastRows === rows) return;
-        this._lastCols = cols;
-        this._lastRows = rows;
-        if (this.socket && this.socket.connected) {
-          if (this.wasEncrypted) {
-            if (this.e2ee && this.e2ee.isReady) {
-              const jsonBytes = new TextEncoder().encode(JSON.stringify({ cols, rows }));
-              const framed = new Uint8Array(1 + jsonBytes.length);
-              framed[0] = 0x02;
-              framed.set(jsonBytes, 1);
-              this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
-                this.socket.emit('terminal:input:enc', Buffer.from(wireBuf));
-              });
-            }
-            return;
-          }
-          this.socket.emit('terminal:resize', { cols, rows });
-        }
-      },
-    };
+    tab.resize(false);
+    tab.resize(false); // unchanged size: no-op
+    tab.resize(true);  // Grid Mode forced resize
 
-    // 1. Unchanged resize without force is a no-op
-    mockTab.resize(false);
-    // 2. Forced resize (Grid Mode) emits encrypted opcode 0x02 even when dimensions match
-    mockTab.resize(true);
-    // 3. Mobile Ctrl+C
-    mobileCtrlActive = true;
-    mockTab.sendInput('c');
-    // 4. Mobile arrow key (length 3, unmodified)
-    mockTab.sendInput('\x1b[A');
-    // 5. Post-upload carriage return
-    mockTab.sendInput('\r');
+    ctx.__setCtrl(true);
+    tab.sendInput('c'); // mobile Ctrl+C
+    assert.equal(ctx.__getCtrl(), false);
+
+    tab.sendInput('\x1b[A'); // mobile arrow key
+    tab.sendInput('\r');     // post-upload newline
 
     await new Promise((r) => setTimeout(r, 100));
 
-    // Must never emit plaintext events
-    assert.ok(emittedEvents.every((e) => e.event === 'terminal:input:enc'));
-    assert.equal(emittedEvents.length, 4);
+    assert.equal(events.length, 5);
+    assert.ok(events.every(([name]) => name === 'terminal:input:enc'));
 
-    const decoded = emittedEvents.map(({ payload }) => {
-      const buf = serverSession.decryptInput(payload);
-      return { op: buf[0], text: buf.subarray(1).toString('utf8') };
+    const decoded = events.map(([, wireBuf]) => {
+      const buf = serverSession.decryptInput(Buffer.from(wireBuf));
+      return [buf[0], buf.subarray(1).toString('utf8')];
     });
 
     assert.deepEqual(decoded, [
-      { op: 0x02, text: '{"cols":80,"rows":24}' },
-      { op: 0x01, text: '\x03' },
-      { op: 0x01, text: '\x1b[A' },
-      { op: 0x01, text: '\r' },
+      [0x02, JSON.stringify({ cols: 100, rows: 40 })],
+      [0x02, JSON.stringify({ cols: 100, rows: 40 })],
+      [0x01, '\x03'],
+      [0x01, '\x1b[A'],
+      [0x01, '\r'],
     ]);
   });
+
+  it('uses plaintext events only when the tab is not encrypted', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+    const { tab, events } = makeTab(ctx, new ClientE2EESession());
+    tab.wasEncrypted = false;
+    tab.sendInput('ls');
+    tab.resize(true);
+    assert.deepEqual(events.map(([n]) => n), ['terminal:input', 'terminal:resize']);
+  });
+
+  it('never emits plaintext for an encrypted tab whose E2EE is not ready', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+    const { tab, events } = makeTab(ctx, new ClientE2EESession());
+    tab.sendInput('secret');
+    tab.resize(true);
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(events.length, 0);
+  });
 });
-
-
