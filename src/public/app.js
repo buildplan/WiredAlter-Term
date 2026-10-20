@@ -161,14 +161,17 @@ if (e2eeModal) {
     // Escape would close the dialog without settling the pending prompt and wedge every tab.
     e2eeModal.addEventListener('cancel', (e) => {
         e.preventDefault();
-        if (!serverE2EEStatus?.forceE2EE && e2eeModalCancel) e2eeModalCancel.click();
+        const activeTab = window.tabManager?.getActiveTab();
+        const isForced = activeTab ? activeTab.isEncryptionRequired() : Boolean(serverE2EEStatus?.forceE2EE);
+        if (!isForced && e2eeModalCancel) e2eeModalCancel.click();
     });
 }
 if (e2eeModalCancel) {
     e2eeModalCancel.addEventListener('click', () => {
         if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
         const activeTab = window.tabManager?.getActiveTab();
-        if (!activeTab?.wasEncrypted && !serverE2EEStatus?.forceE2EE) {
+        const isForced = activeTab ? activeTab.isEncryptionRequired() : Boolean(serverE2EEStatus?.forceE2EE);
+        if (!isForced) {
             const container = document.getElementById('terminals-container');
             if (container) container.classList.remove('e2ee-shielded');
             if (activeTab?.element) activeTab.element.classList.remove('e2ee-shielded');
@@ -459,6 +462,7 @@ class TerminalTab {
         }
 
         this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+        this.e2eeStatus = null;
         this._pendingPassphrase = null;
         this.isProcessExited = false;
 
@@ -478,10 +482,12 @@ class TerminalTab {
         });
 
         this.setupSocketEvents();
-        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+        if (this.isEncryptionRequired()) {
             this.element.classList.add('e2ee-shielded');
-            const container = document.getElementById('terminals-container');
-            if (container) container.classList.add('e2ee-shielded');
+            if (this.isActive()) {
+                const container = document.getElementById('terminals-container');
+                if (container) container.classList.add('e2ee-shielded');
+            }
         }
 
         if (this.term.textarea) {
@@ -518,11 +524,17 @@ class TerminalTab {
         this.resizeObserver.observe(document.getElementById('terminals-container'));
     }
 
+    isEncryptionRequired() {
+        if (this.wasEncrypted) return true;
+        if (this.e2eeStatus) return Boolean(this.e2eeStatus.forceE2EE);
+        return Boolean(serverE2EEStatus?.forceE2EE);
+    }
+
     sendInput(data) {
         if (!data || !this.socket) return;
         data = applyMobileModifiers(data);
         if (data === null) return;
-        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+        if (this.isEncryptionRequired()) {
             if (this.e2ee && this.e2ee.isReady) {
                 const dataBytes = new TextEncoder().encode(data);
                 const framed = new Uint8Array(1 + dataBytes.length);
@@ -553,7 +565,7 @@ class TerminalTab {
         this.term.write(data);
     }
 
-    async initiateE2EE(status = serverE2EEStatus, errorMsg = '') {
+    async initiateE2EE(status = this.e2eeStatus || serverE2EEStatus, errorMsg = '') {
         if (this.e2ee && this.e2ee.isReady) return;
         if (this._e2eeInFlight) return;
         this._e2eeInFlight = true;
@@ -574,21 +586,30 @@ class TerminalTab {
 
     setupSocketEvents() {
         this.socket.on('e2ee:status', (status) => {
-            serverE2EEStatus = status;
+            this.e2eeStatus = status;
+            serverE2EEStatus = {
+                ...status,
+                forceE2EE: typeof status.serverForceE2EE === 'boolean' ? status.serverForceE2EE : Boolean(status.forceE2EE)
+            };
             if (this.isActive()) {
                 updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
-            if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
+            if (this.isEncryptionRequired() && (!this.e2ee || !this.e2ee.isReady)) {
+                if (this.element) this.element.classList.add('e2ee-shielded');
                 if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.add('e2ee-shielded');
                     const notice = this._e2eeNotice || '';
                     this._e2eeNotice = null;
                     this.initiateE2EE(status, notice);
                 }
-            } else if (!status.forceE2EE && !this.wasEncrypted) {
+            } else if (!this.isEncryptionRequired()) {
                 if (this.element) this.element.classList.remove('e2ee-shielded');
-                const container = document.getElementById('terminals-container');
-                if (container) container.classList.remove('e2ee-shielded');
-                if (this.isActive()) this.term.focus();
+                if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.remove('e2ee-shielded');
+                    this.term.focus();
+                }
             }
         });
 
@@ -643,13 +664,14 @@ class TerminalTab {
                     ? 'Passkey was cancelled or timed out. Try again.'
                     : (err.message || 'Authentication error');
                 // The previous prompt already resolved, so re-open it or its buttons do nothing.
-                this.initiateE2EE(serverE2EEStatus, msg);
+                this.initiateE2EE(this.e2eeStatus || serverE2EEStatus, msg);
             }
         });
 
         this.socket.on('e2ee:ready', (data) => {
             this._e2eeInFlight = false;
             this._e2eeNotice = null;
+            this._pendingPassphrase = null;
             this.e2ee.markReady();
             this.wasEncrypted = true;
             if (this.tabElement) {
@@ -674,12 +696,13 @@ class TerminalTab {
         this.socket.on('e2ee:error', (msg) => {
             console.error("E2EE Error from server:", msg);
             this._e2eeInFlight = false;
+            this._pendingPassphrase = null;
             cachedSessionPassphrase = null;
             // Fatal errors make the server drop the socket; the reconnect's status event shows the prompt.
             this._e2eeNotice = msg;
             setTimeout(() => {
                 if (this._e2eeNotice && this.socket?.connected && !this._e2eeInFlight && !(this.e2ee && this.e2ee.isReady)) {
-                    this.initiateE2EE(serverE2EEStatus, this._e2eeNotice);
+                    this.initiateE2EE(this.e2eeStatus || serverE2EEStatus, this._e2eeNotice);
                 }
             }, 2500);
         });
@@ -694,10 +717,21 @@ class TerminalTab {
             this._e2eeInFlight = false;
             // On fresh connection, re-instantiate client E2EE session for fresh keys
             this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+            if (this.tabElement) {
+                this.tabElement.classList.remove('tab-encrypted');
+            }
+            if (this.isEncryptionRequired()) {
+                if (this.element) this.element.classList.add('e2ee-shielded');
+                if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.add('e2ee-shielded');
+                }
+            }
             this.syncStatus();
             this._lastCols = null;
             this._lastRows = null;
             if (this.isActive()) {
+                updateE2EEUI(false);
                 this.term.focus();
                 this.startLatencyCheck();
                 setTimeout(() => {
@@ -846,9 +880,16 @@ class TerminalTab {
         this.syncStatus();
         this.startLatencyCheck();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
-        if (this.socket && this.socket.connected && serverE2EEStatus
-            && (this.wasEncrypted || serverE2EEStatus.forceE2EE) && !(this.e2ee && this.e2ee.isReady)) {
-            this.initiateE2EE();
+        const needsE2EE = this.isEncryptionRequired() && !(this.e2ee && this.e2ee.isReady);
+        const container = document.getElementById('terminals-container');
+        if (needsE2EE) {
+            if (this.element) this.element.classList.add('e2ee-shielded');
+            if (container) container.classList.add('e2ee-shielded');
+        } else {
+            if (container) container.classList.remove('e2ee-shielded');
+        }
+        if (this.socket && this.socket.connected && (this.e2eeStatus || serverE2EEStatus) && needsE2EE) {
+            this.initiateE2EE(this.e2eeStatus || serverE2EEStatus);
         }
         if (this.socket && !this.socket.connected && !this.isProcessExited) {
             this.socket.connect();
@@ -891,7 +932,7 @@ class TerminalTab {
             this._lastRows = rows;
 
             if (this.socket && this.socket.connected) {
-                if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                if (this.isEncryptionRequired()) {
                     if (this.e2ee && this.e2ee.isReady) {
                         const jsonBytes = new TextEncoder().encode(JSON.stringify({ cols, rows }));
                         const framed = new Uint8Array(1 + jsonBytes.length);
@@ -930,6 +971,8 @@ class TerminalTab {
 
     // 3. CORRECTED DESTROY METHOD
     destroy() {
+        this._pendingPassphrase = null;
+        this.e2ee = null;
         try {
             if (this.element) this.element.remove();
             if (this.tabElement) this.tabElement.remove();
@@ -1196,6 +1239,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            cachedSessionPassphrase = null;
+            if (window.tabManager) {
+                window.tabManager.tabs.forEach(tab => {
+                    tab._pendingPassphrase = null;
+                    tab.e2ee = null;
+                });
+            }
             logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
             fetch('/logout', { method: 'POST' }).then(() => {
                 window.location.href = '/login';
@@ -1752,7 +1802,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (secPassToggle) {
         secPassToggle.addEventListener('click', () => {
             if (!currentSettings || !currentSettings.hasEnvPassphrase) return;
-            updateSetting({ disablePassphrase: !currentSettings.disablePassphrase });
+            const nextDisable = !currentSettings.disablePassphrase;
+            if (nextDisable) cachedSessionPassphrase = null;
+            updateSetting({ disablePassphrase: nextDisable });
         });
     }
 

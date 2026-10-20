@@ -501,7 +501,8 @@ describe('TerminalTab encrypted input routing (app.js)', () => {
         querySelectorAll: () => [],
         addEventListener() {},
       },
-      window: { tabManager: null, addEventListener() {} },
+      window: { tabManager: null, ClientE2EESession: globalThis.ClientE2EESession, addEventListener() {} },
+      ClientE2EESession: globalThis.ClientE2EESession,
       localStorage: { getItem: () => null, setItem() {} },
       TextEncoder,
       Uint8Array,
@@ -597,5 +598,80 @@ describe('TerminalTab encrypted input routing (app.js)', () => {
     tab.resize(true);
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(events.length, 0);
+  });
+
+  it('isolates per-tab e2eeStatus across mixed encrypted and unencrypted tabs and shields on reconnect', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+
+    const makeStatefulTab = (id, wasEncrypted) => {
+      const listeners = {};
+      const emitted = [];
+      const classes = new Set();
+      const tab = Object.create(ctx.__T.prototype);
+      tab.id = id;
+      tab.manager = { activeTabId: 2 };
+      tab.wasEncrypted = wasEncrypted;
+      tab.e2eeStatus = null;
+      tab.e2ee = new ClientE2EESession();
+      tab.fitAddon = { fit() {} };
+      tab.term = { cols: 80, rows: 24, focus() {}, write() {}, dispose() {} };
+      tab.element = {
+        classList: {
+          add: (c) => classes.add(c),
+          remove: (c) => classes.delete(c),
+          contains: (c) => classes.has(c),
+        },
+        remove() {},
+      };
+      tab.tabElement = {
+        classList: { add() {}, remove() {}, toggle() {} },
+        remove() {},
+      };
+      tab.socket = {
+        connected: true,
+        on: (ev, fn) => { listeners[ev] = fn; },
+        emit: (name, payload) => emitted.push([name, payload]),
+        disconnect() {},
+      };
+      tab.setupSocketEvents();
+      return { tab, listeners, emitted, classes };
+    };
+
+    const encTab = makeStatefulTab(1, true);
+    const plainTab = makeStatefulTab(2, false);
+
+    // 1. Encrypted tab 1 (inactive in Grid Mode) reconnects and receives per-tab forceE2EE: true, serverForceE2EE: false
+    encTab.listeners['connect']();
+    assert.equal(encTab.classes.has('e2ee-shielded'), true);
+
+    encTab.listeners['e2ee:status']({
+      forceE2EE: true,
+      serverForceE2EE: false,
+      availableModes: { passkey: false, passphrase: true },
+      iterations: 1000,
+    });
+    assert.equal(encTab.tab.isEncryptionRequired(), true);
+    assert.equal(encTab.classes.has('e2ee-shielded'), true);
+
+    // 2. Unencrypted tab 2 must NOT be blocked by tab 1's per-tab forceE2EE
+    assert.equal(plainTab.tab.isEncryptionRequired(), false);
+    plainTab.tab.sendInput('pwd\n');
+    assert.deepEqual(plainTab.emitted, [['terminal:input', 'pwd\n']]);
+
+    // 3. Unencrypted tab 2 receives its own e2ee:status (forceE2EE: false) — must not clear tab 1's requirement
+    plainTab.listeners['e2ee:status']({
+      forceE2EE: false,
+      serverForceE2EE: false,
+      availableModes: { passkey: false, passphrase: true },
+      iterations: 1000,
+    });
+    assert.equal(encTab.tab.isEncryptionRequired(), true);
+
+    // 4. Destroying encrypted tab clears pending passphrase and e2ee instance
+    encTab.tab._pendingPassphrase = 'secret';
+    encTab.tab.destroy();
+    assert.equal(encTab.tab._pendingPassphrase, null);
+    assert.equal(encTab.tab.e2ee, null);
   });
 });

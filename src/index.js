@@ -704,6 +704,7 @@ io.on('connection', (socket) => {
     // Emit initial status so client knows if E2EE is required, available, and iterations
     socket.emit('e2ee:status', {
         forceE2EE: isEncryptedTab,
+        serverForceE2EE: effectiveForceE2EE,
         availableModes,
         iterations: E2EE_PBKDF2_ITERATIONS
     });
