@@ -148,7 +148,17 @@ const submitPassphrase = () => {
     }
 };
 
-if (e2eeModalSubmit) e2eeModalSubmit.addEventListener('click', submitPassphrase);
+const e2eePassphraseForm = document.getElementById('e2ee-passphrase-form');
+if (e2eePassphraseForm) {
+    e2eePassphraseForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitPassphrase();
+    });
+}
+if (e2eeModalSubmit) e2eeModalSubmit.addEventListener('click', (e) => {
+    e.preventDefault();
+    submitPassphrase();
+});
 if (e2eePassphraseInput) {
     e2eePassphraseInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
