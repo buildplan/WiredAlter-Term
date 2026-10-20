@@ -482,3 +482,196 @@ describe('Multiplexed C2S Opcode Framing & Concurrency', () => {
   });
 });
 
+describe('TerminalTab encrypted input routing (app.js)', () => {
+  const loadApp = async () => {
+    await import('../src/public/e2ee-client.js');
+    const vm = await import('node:vm');
+    const fs = await import('node:fs');
+    const stub = () => new Proxy(function () {}, {
+      get: (_t, p) => (p === Symbol.toPrimitive ? () => '' : stub()),
+      apply: () => stub(),
+      construct: () => stub(),
+    });
+    const sandbox = {
+      document: {
+        getElementById: () => stub(),
+        documentElement: stub(),
+        body: stub(),
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener() {},
+      },
+      window: { tabManager: null, ClientE2EESession: globalThis.ClientE2EESession, addEventListener() {} },
+      ClientE2EESession: globalThis.ClientE2EESession,
+      localStorage: { getItem: () => null, setItem() {} },
+      TextEncoder,
+      Uint8Array,
+      console,
+      setTimeout,
+      clearInterval,
+      setInterval,
+      io: stub(),
+    };
+    const ctx = vm.createContext(sandbox);
+    const src = fs.readFileSync(new URL('../src/public/app.js', import.meta.url), 'utf8');
+    vm.runInContext(
+      `${src}\n;globalThis.__T = TerminalTab; globalThis.__setCtrl = (v) => { mobileCtrlActive = v; }; globalThis.__getCtrl = () => mobileCtrlActive;`,
+      ctx
+    );
+    return ctx;
+  };
+
+  const makeTab = (ctx, e2eeSession) => {
+    const events = [];
+    const tab = Object.create(ctx.__T.prototype);
+    tab.wasEncrypted = true;
+    tab.socket = { connected: true, emit: (name, payload) => events.push([name, payload]) };
+    tab.e2ee = e2eeSession;
+    tab.fitAddon = { fit() {} };
+    tab.term = { cols: 100, rows: 40 };
+    return { tab, events };
+  };
+
+  it('routes input, resize, mobile keys and post-upload newline only via terminal:input:enc', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+    const serverSession = new ServerE2EESession(1000);
+    const clientSession = new ClientE2EESession();
+
+    const challenge = serverSession.initChallenge('passphrase');
+    const proof = await clientSession.completePassphraseChallenge(
+      'corp-passphrase',
+      challenge.salt,
+      challenge.serverNonce,
+      challenge.iterations
+    );
+    await serverSession.verifyPassphraseHandshake('corp-passphrase', proof);
+    clientSession.markReady();
+
+    const { tab, events } = makeTab(ctx, clientSession);
+
+    tab.resize(false);
+    tab.resize(false); // unchanged size: no-op
+    tab.resize(true);  // Grid Mode forced resize
+
+    ctx.__setCtrl(true);
+    tab.sendInput('c'); // mobile Ctrl+C
+    assert.equal(ctx.__getCtrl(), false);
+
+    tab.sendInput('\x1b[A'); // mobile arrow key
+    tab.sendInput('\r');     // post-upload newline
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    assert.equal(events.length, 5);
+    assert.ok(events.every(([name]) => name === 'terminal:input:enc'));
+
+    const decoded = events.map(([, wireBuf]) => {
+      const buf = serverSession.decryptInput(Buffer.from(wireBuf));
+      return [buf[0], buf.subarray(1).toString('utf8')];
+    });
+
+    assert.deepEqual(decoded, [
+      [0x02, JSON.stringify({ cols: 100, rows: 40 })],
+      [0x02, JSON.stringify({ cols: 100, rows: 40 })],
+      [0x01, '\x03'],
+      [0x01, '\x1b[A'],
+      [0x01, '\r'],
+    ]);
+  });
+
+  it('uses plaintext events only when the tab is not encrypted', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+    const { tab, events } = makeTab(ctx, new ClientE2EESession());
+    tab.wasEncrypted = false;
+    tab.sendInput('ls');
+    tab.resize(true);
+    assert.deepEqual(events.map(([n]) => n), ['terminal:input', 'terminal:resize']);
+  });
+
+  it('never emits plaintext for an encrypted tab whose E2EE is not ready', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+    const { tab, events } = makeTab(ctx, new ClientE2EESession());
+    tab.sendInput('secret');
+    tab.resize(true);
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(events.length, 0);
+  });
+
+  it('isolates per-tab e2eeStatus across mixed encrypted and unencrypted tabs and shields on reconnect', async () => {
+    const ctx = await loadApp();
+    const ClientE2EESession = globalThis.ClientE2EESession;
+
+    const makeStatefulTab = (id, wasEncrypted) => {
+      const listeners = {};
+      const emitted = [];
+      const classes = new Set();
+      const tab = Object.create(ctx.__T.prototype);
+      tab.id = id;
+      tab.manager = { activeTabId: 2 };
+      tab.wasEncrypted = wasEncrypted;
+      tab.e2eeStatus = null;
+      tab.e2ee = new ClientE2EESession();
+      tab.fitAddon = { fit() {} };
+      tab.term = { cols: 80, rows: 24, focus() {}, write() {}, dispose() {} };
+      tab.element = {
+        classList: {
+          add: (c) => classes.add(c),
+          remove: (c) => classes.delete(c),
+          contains: (c) => classes.has(c),
+        },
+        remove() {},
+      };
+      tab.tabElement = {
+        classList: { add() {}, remove() {}, toggle() {} },
+        remove() {},
+      };
+      tab.socket = {
+        connected: true,
+        on: (ev, fn) => { listeners[ev] = fn; },
+        emit: (name, payload) => emitted.push([name, payload]),
+        disconnect() {},
+      };
+      tab.setupSocketEvents();
+      return { tab, listeners, emitted, classes };
+    };
+
+    const encTab = makeStatefulTab(1, true);
+    const plainTab = makeStatefulTab(2, false);
+
+    // 1. Encrypted tab 1 (inactive in Grid Mode) reconnects and receives per-tab forceE2EE: true, serverForceE2EE: false
+    encTab.listeners['connect']();
+    assert.equal(encTab.classes.has('e2ee-shielded'), true);
+
+    encTab.listeners['e2ee:status']({
+      forceE2EE: true,
+      serverForceE2EE: false,
+      availableModes: { passkey: false, passphrase: true },
+      iterations: 1000,
+    });
+    assert.equal(encTab.tab.isEncryptionRequired(), true);
+    assert.equal(encTab.classes.has('e2ee-shielded'), true);
+
+    // 2. Unencrypted tab 2 must NOT be blocked by tab 1's per-tab forceE2EE
+    assert.equal(plainTab.tab.isEncryptionRequired(), false);
+    plainTab.tab.sendInput('pwd\n');
+    assert.deepEqual(plainTab.emitted, [['terminal:input', 'pwd\n']]);
+
+    // 3. Unencrypted tab 2 receives its own e2ee:status (forceE2EE: false) — must not clear tab 1's requirement
+    plainTab.listeners['e2ee:status']({
+      forceE2EE: false,
+      serverForceE2EE: false,
+      availableModes: { passkey: false, passphrase: true },
+      iterations: 1000,
+    });
+    assert.equal(encTab.tab.isEncryptionRequired(), true);
+
+    // 4. Destroying encrypted tab clears pending passphrase and e2ee instance
+    encTab.tab._pendingPassphrase = 'secret';
+    encTab.tab.destroy();
+    assert.equal(encTab.tab._pendingPassphrase, null);
+    assert.equal(encTab.tab.e2ee, null);
+  });
+});

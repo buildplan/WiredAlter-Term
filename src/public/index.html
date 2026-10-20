@@ -7,6 +7,7 @@
 
     <link rel="apple-touch-icon" href="/terminal.png">
     <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0d1117">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,7 +17,7 @@
     <link rel="preload" href="/fonts/font.ttf" as="font" type="font/ttf" crossorigin>
 
     <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
-    <link rel="stylesheet" href="style.css?v=4.1">
+    <link rel="stylesheet" href="style.css?v=4.2">
 
     <script src="/vendor/sortablejs/Sortable.min.js"></script>
     <script src="/vendor/xterm/xterm.js"></script>
@@ -244,17 +245,19 @@
                 <span>or use passphrase</span>
             </div>
 
-            <div id="e2ee-passphrase-container" class="e2ee-input-group" style="display: none;">
-                <label for="e2ee-passphrase-input" class="e2ee-input-label">Encryption Passphrase</label>
-                <input type="password" id="e2ee-passphrase-input" class="e2ee-input" placeholder="Enter passphrase..." autocomplete="current-password" />
-            </div>
+            <form id="e2ee-passphrase-form">
+                <div id="e2ee-passphrase-container" class="e2ee-input-group" style="display: none;">
+                    <label for="e2ee-passphrase-input" class="e2ee-input-label">Encryption Passphrase</label>
+                    <input type="password" id="e2ee-passphrase-input" class="e2ee-input" placeholder="Enter passphrase..." autocomplete="current-password" />
+                </div>
 
-            <div id="e2ee-feedback-msg" class="e2ee-feedback"></div>
+                <div id="e2ee-feedback-msg" class="e2ee-feedback"></div>
 
-            <div class="e2ee-modal-actions">
-                <button id="e2ee-modal-cancel" class="icon-btn" style="display: none;" type="button">Cancel</button>
-                <button id="e2ee-modal-submit" class="e2ee-submit-btn" style="display: none;" type="button">Turn on E2EE</button>
-            </div>
+                <div class="e2ee-modal-actions">
+                    <button id="e2ee-modal-cancel" class="icon-btn" style="display: none;" type="button">Cancel</button>
+                    <button id="e2ee-modal-submit" class="e2ee-submit-btn" style="display: none;" type="submit">Turn on E2EE</button>
+                </div>
+            </form>
         </div>
     </dialog>
 

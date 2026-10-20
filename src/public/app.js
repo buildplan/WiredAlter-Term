@@ -148,7 +148,17 @@ const submitPassphrase = () => {
     }
 };
 
-if (e2eeModalSubmit) e2eeModalSubmit.addEventListener('click', submitPassphrase);
+const e2eePassphraseForm = document.getElementById('e2ee-passphrase-form');
+if (e2eePassphraseForm) {
+    e2eePassphraseForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitPassphrase();
+    });
+}
+if (e2eeModalSubmit) e2eeModalSubmit.addEventListener('click', (e) => {
+    e.preventDefault();
+    submitPassphrase();
+});
 if (e2eePassphraseInput) {
     e2eePassphraseInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -161,14 +171,17 @@ if (e2eeModal) {
     // Escape would close the dialog without settling the pending prompt and wedge every tab.
     e2eeModal.addEventListener('cancel', (e) => {
         e.preventDefault();
-        if (!serverE2EEStatus?.forceE2EE && e2eeModalCancel) e2eeModalCancel.click();
+        const activeTab = window.tabManager?.getActiveTab();
+        const isForced = activeTab ? activeTab.isEncryptionRequired() : Boolean(serverE2EEStatus?.forceE2EE);
+        if (!isForced && e2eeModalCancel) e2eeModalCancel.click();
     });
 }
 if (e2eeModalCancel) {
     e2eeModalCancel.addEventListener('click', () => {
         if (e2eeModal && typeof e2eeModal.close === 'function') e2eeModal.close();
         const activeTab = window.tabManager?.getActiveTab();
-        if (!activeTab?.wasEncrypted && !serverE2EEStatus?.forceE2EE) {
+        const isForced = activeTab ? activeTab.isEncryptionRequired() : Boolean(serverE2EEStatus?.forceE2EE);
+        if (!isForced) {
             const container = document.getElementById('terminals-container');
             if (container) container.classList.remove('e2ee-shielded');
             if (activeTab?.element) activeTab.element.classList.remove('e2ee-shielded');
@@ -283,6 +296,82 @@ async function waitForFonts() {
     }
 }
 
+// --- MOBILE MODIFIER STATE ---
+let mobileCtrlActive = false;
+let mobileAltActive = false;
+
+function applyMobileModifiers(payload) {
+    if ((mobileCtrlActive || mobileAltActive) && payload.length === 1) {
+        const mCtrlBtn = document.getElementById('m-ctrl-btn');
+        const mAltBtn = document.getElementById('m-alt-btn');
+        const charLower = payload.toLowerCase();
+
+        // --- LOCAL APP SHORTCUTS (Ctrl + Alt) ---
+        if (mobileCtrlActive && mobileAltActive) {
+            let shortcutTriggered = false;
+
+            if (charLower === 't') { if (window.tabManager) window.tabManager.createTab(); shortcutTriggered = true; }
+            else if (charLower === 'x') { if (window.tabManager && window.tabManager.activeTabId) window.tabManager.closeTab(window.tabManager.activeTabId); shortcutTriggered = true; }
+            else if (charLower === 'g') { const btn = document.getElementById('grid-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+            else if (charLower === 'm') { const btn = document.getElementById('mouse-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+            else if (charLower === 'l') { const btn = document.getElementById('theme-btn'); if (btn) btn.click(); shortcutTriggered = true; }
+            else if (charLower === 'f') {
+                const searchBar = document.getElementById('search-bar');
+                const searchInput = document.getElementById('search-input');
+                if (searchBar && searchInput) {
+                    searchBar.classList.remove('hidden');
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                shortcutTriggered = true;
+            }
+            else if (payload === '[' || payload === ']') {
+                const tabElements = Array.from(document.querySelectorAll('.tab'));
+                const activeTabEl = document.querySelector('.tab.active');
+                if (tabElements.length > 1 && activeTabEl) {
+                    const currentIndex = tabElements.indexOf(activeTabEl);
+                    const nextIndex = payload === '['
+                        ? (currentIndex - 1 + tabElements.length) % tabElements.length
+                        : (currentIndex + 1) % tabElements.length;
+                    tabElements[nextIndex].click();
+                }
+                shortcutTriggered = true;
+            }
+            if (shortcutTriggered) {
+                mobileCtrlActive = false;
+                mobileAltActive = false;
+                if (mCtrlBtn) mCtrlBtn.classList.remove('active-toggle');
+                if (mAltBtn) mAltBtn.classList.remove('active-toggle');
+                return null;
+            }
+        }
+
+        // --- STANDARD TERMINAL MODIFIERS ---
+        let modifiedPayload = payload;
+        const charCode = payload.charCodeAt(0);
+        if (mobileCtrlActive) {
+            if (charCode >= 97 && charCode <= 122) {
+                modifiedPayload = String.fromCharCode(charCode - 96);
+            }
+            else if (charCode >= 65 && charCode <= 90) {
+                modifiedPayload = String.fromCharCode(charCode - 64);
+            }
+            else if (payload === ' ') {
+                modifiedPayload = '\x00';
+            }
+            mobileCtrlActive = false;
+            if (mCtrlBtn) mCtrlBtn.classList.remove('active-toggle');
+        }
+        if (mobileAltActive) {
+            modifiedPayload = '\x1b' + modifiedPayload;
+            mobileAltActive = false;
+            if (mAltBtn) mAltBtn.classList.remove('active-toggle');
+        }
+        return modifiedPayload;
+    }
+    return payload;
+}
+
 // --- TERMINAL TAB CLASS ---
 class TerminalTab {
     constructor(id, manager, name = null, savedContent = '', isEncrypted = false) {
@@ -383,6 +472,7 @@ class TerminalTab {
         }
 
         this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+        this.e2eeStatus = null;
         this._pendingPassphrase = null;
         this.isProcessExited = false;
 
@@ -402,10 +492,12 @@ class TerminalTab {
         });
 
         this.setupSocketEvents();
-        if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+        if (this.isEncryptionRequired()) {
             this.element.classList.add('e2ee-shielded');
-            const container = document.getElementById('terminals-container');
-            if (container) container.classList.add('e2ee-shielded');
+            if (this.isActive()) {
+                const container = document.getElementById('terminals-container');
+                if (container) container.classList.add('e2ee-shielded');
+            }
         }
 
         if (this.term.textarea) {
@@ -427,20 +519,7 @@ class TerminalTab {
                 }
                 return;
             }
-            if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
-                if (this.e2ee && this.e2ee.isReady) {
-                    const dataBytes = new TextEncoder().encode(data);
-                    const framed = new Uint8Array(1 + dataBytes.length);
-                    framed[0] = 0x01; // OP_INPUT
-                    framed.set(dataBytes, 1);
-                    this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
-                        this.socket.emit('terminal:input:enc', wireBuf);
-                    });
-                }
-                // Never emit plaintext if this tab was encrypted!
-                return;
-            }
-            this.socket.emit('terminal:input', data);
+            this.sendInput(data);
         });
 
         // Initial Resize Request
@@ -453,6 +532,32 @@ class TerminalTab {
             }
         });
         this.resizeObserver.observe(document.getElementById('terminals-container'));
+    }
+
+    isEncryptionRequired() {
+        if (this.wasEncrypted) return true;
+        if (this.e2eeStatus) return Boolean(this.e2eeStatus.forceE2EE);
+        return Boolean(serverE2EEStatus?.forceE2EE);
+    }
+
+    sendInput(data) {
+        if (!data || !this.socket) return;
+        data = applyMobileModifiers(data);
+        if (data === null) return;
+        if (this.isEncryptionRequired()) {
+            if (this.e2ee && this.e2ee.isReady) {
+                const dataBytes = new TextEncoder().encode(data);
+                const framed = new Uint8Array(1 + dataBytes.length);
+                framed[0] = 0x01; // OP_INPUT
+                framed.set(dataBytes, 1);
+                this.e2ee.enqueueEncryptInput(framed, (wireBuf) => {
+                    this.socket.emit('terminal:input:enc', wireBuf);
+                });
+            }
+            // Never emit plaintext if this tab was encrypted!
+            return;
+        }
+        this.socket.emit('terminal:input', data);
     }
 
     handleOutputData(data) {
@@ -470,7 +575,7 @@ class TerminalTab {
         this.term.write(data);
     }
 
-    async initiateE2EE(status = serverE2EEStatus, errorMsg = '') {
+    async initiateE2EE(status = this.e2eeStatus || serverE2EEStatus, errorMsg = '') {
         if (this.e2ee && this.e2ee.isReady) return;
         if (this._e2eeInFlight) return;
         this._e2eeInFlight = true;
@@ -491,21 +596,30 @@ class TerminalTab {
 
     setupSocketEvents() {
         this.socket.on('e2ee:status', (status) => {
-            serverE2EEStatus = status;
+            this.e2eeStatus = status;
+            serverE2EEStatus = {
+                ...status,
+                forceE2EE: typeof status.serverForceE2EE === 'boolean' ? status.serverForceE2EE : Boolean(status.forceE2EE)
+            };
             if (this.isActive()) {
                 updateE2EEUI(this.e2ee && this.e2ee.isReady);
             }
-            if ((status.forceE2EE || this.wasEncrypted) && (!this.e2ee || !this.e2ee.isReady)) {
+            if (this.isEncryptionRequired() && (!this.e2ee || !this.e2ee.isReady)) {
+                if (this.element) this.element.classList.add('e2ee-shielded');
                 if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.add('e2ee-shielded');
                     const notice = this._e2eeNotice || '';
                     this._e2eeNotice = null;
                     this.initiateE2EE(status, notice);
                 }
-            } else if (!status.forceE2EE && !this.wasEncrypted) {
+            } else if (!this.isEncryptionRequired()) {
                 if (this.element) this.element.classList.remove('e2ee-shielded');
-                const container = document.getElementById('terminals-container');
-                if (container) container.classList.remove('e2ee-shielded');
-                if (this.isActive()) this.term.focus();
+                if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.remove('e2ee-shielded');
+                    this.term.focus();
+                }
             }
         });
 
@@ -560,13 +674,14 @@ class TerminalTab {
                     ? 'Passkey was cancelled or timed out. Try again.'
                     : (err.message || 'Authentication error');
                 // The previous prompt already resolved, so re-open it or its buttons do nothing.
-                this.initiateE2EE(serverE2EEStatus, msg);
+                this.initiateE2EE(this.e2eeStatus || serverE2EEStatus, msg);
             }
         });
 
         this.socket.on('e2ee:ready', (data) => {
             this._e2eeInFlight = false;
             this._e2eeNotice = null;
+            this._pendingPassphrase = null;
             this.e2ee.markReady();
             this.wasEncrypted = true;
             if (this.tabElement) {
@@ -591,12 +706,13 @@ class TerminalTab {
         this.socket.on('e2ee:error', (msg) => {
             console.error("E2EE Error from server:", msg);
             this._e2eeInFlight = false;
+            this._pendingPassphrase = null;
             cachedSessionPassphrase = null;
             // Fatal errors make the server drop the socket; the reconnect's status event shows the prompt.
             this._e2eeNotice = msg;
             setTimeout(() => {
                 if (this._e2eeNotice && this.socket?.connected && !this._e2eeInFlight && !(this.e2ee && this.e2ee.isReady)) {
-                    this.initiateE2EE(serverE2EEStatus, this._e2eeNotice);
+                    this.initiateE2EE(this.e2eeStatus || serverE2EEStatus, this._e2eeNotice);
                 }
             }, 2500);
         });
@@ -611,10 +727,21 @@ class TerminalTab {
             this._e2eeInFlight = false;
             // On fresh connection, re-instantiate client E2EE session for fresh keys
             this.e2ee = new (window.ClientE2EESession || ClientE2EESession)();
+            if (this.tabElement) {
+                this.tabElement.classList.remove('tab-encrypted');
+            }
+            if (this.isEncryptionRequired()) {
+                if (this.element) this.element.classList.add('e2ee-shielded');
+                if (this.isActive()) {
+                    const container = document.getElementById('terminals-container');
+                    if (container) container.classList.add('e2ee-shielded');
+                }
+            }
             this.syncStatus();
             this._lastCols = null;
             this._lastRows = null;
             if (this.isActive()) {
+                updateE2EEUI(false);
                 this.term.focus();
                 this.startLatencyCheck();
                 setTimeout(() => {
@@ -763,9 +890,16 @@ class TerminalTab {
         this.syncStatus();
         this.startLatencyCheck();
         updateE2EEUI(this.e2ee && this.e2ee.isReady);
-        if (this.socket && this.socket.connected && serverE2EEStatus
-            && (this.wasEncrypted || serverE2EEStatus.forceE2EE) && !(this.e2ee && this.e2ee.isReady)) {
-            this.initiateE2EE();
+        const needsE2EE = this.isEncryptionRequired() && !(this.e2ee && this.e2ee.isReady);
+        const container = document.getElementById('terminals-container');
+        if (needsE2EE) {
+            if (this.element) this.element.classList.add('e2ee-shielded');
+            if (container) container.classList.add('e2ee-shielded');
+        } else {
+            if (container) container.classList.remove('e2ee-shielded');
+        }
+        if (this.socket && this.socket.connected && (this.e2eeStatus || serverE2EEStatus) && needsE2EE) {
+            this.initiateE2EE(this.e2eeStatus || serverE2EEStatus);
         }
         if (this.socket && !this.socket.connected && !this.isProcessExited) {
             this.socket.connect();
@@ -798,17 +932,17 @@ class TerminalTab {
         clearInterval(this.pingInterval);
     }
 
-    resize() {
+    resize(force = false) {
         try {
             this.fitAddon.fit();
             const cols = this.term.cols || 80;
             const rows = this.term.rows || 30;
-            if (this._lastCols === cols && this._lastRows === rows) return;
+            if (!force && this._lastCols === cols && this._lastRows === rows) return;
             this._lastCols = cols;
             this._lastRows = rows;
 
             if (this.socket && this.socket.connected) {
-                if (this.wasEncrypted || serverE2EEStatus?.forceE2EE) {
+                if (this.isEncryptionRequired()) {
                     if (this.e2ee && this.e2ee.isReady) {
                         const jsonBytes = new TextEncoder().encode(JSON.stringify({ cols, rows }));
                         const framed = new Uint8Array(1 + jsonBytes.length);
@@ -847,6 +981,8 @@ class TerminalTab {
 
     // 3. CORRECTED DESTROY METHOD
     destroy() {
+        this._pendingPassphrase = null;
+        this.e2ee = null;
         try {
             if (this.element) this.element.remove();
             if (this.tabElement) this.tabElement.remove();
@@ -1061,10 +1197,12 @@ class TabManager {
                     body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
-                activeTab.socket.emit('terminal:input', '\r');
+                const fileList = Array.from(files, f => (f.name || 'unknown_file').replace(/[\x00-\x1f\x7f]/g, '')).join(', ');
+                activeTab.term.write(`\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
+                activeTab.sendInput('\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
-                activeTab.socket.emit('terminal:input', '\r');
+                activeTab.sendInput('\r');
             }
         });
     }
@@ -1085,13 +1223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (window.tabManager) {
                 window.tabManager.tabs.forEach(tab => {
                     setTimeout(() => {
-                        tab.fitAddon.fit();
-                        if (tab.socket && tab.socket.connected) {
-                            tab.socket.emit('terminal:resize', {
-                                cols: tab.term.cols,
-                                rows: tab.term.rows
-                            });
-                        }
+                        tab.resize(true);
                     }, 50);
                 });
                 const active = window.tabManager.getActiveTab();
@@ -1117,6 +1249,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            cachedSessionPassphrase = null;
+            if (window.tabManager) {
+                window.tabManager.tabs.forEach(tab => {
+                    tab._pendingPassphrase = null;
+                    tab.e2ee = null;
+                });
+            }
             logoutBtn.innerHTML = '<span class="btn-text">Bye!</span> ⏻';
             fetch('/logout', { method: 'POST' }).then(() => {
                 window.location.href = '/login';
@@ -1286,8 +1425,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- VIRTUAL MOBILE KEYBOARD LOGIC ---
-    let mobileCtrlActive = false;
-    let mobileAltActive = false;
     const mCtrlBtn = document.getElementById('m-ctrl-btn');
     const mAltBtn = document.getElementById('m-alt-btn');
 
@@ -1319,88 +1456,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (activeTab) activeTab.term.focus();
                 return;
             }
-            if (mKeyMap[keyType] && activeTab && activeTab.socket) {
-                activeTab.socket.emit('terminal:input', mKeyMap[keyType]);
+            if (mKeyMap[keyType] && activeTab) {
+                activeTab.sendInput(mKeyMap[keyType]);
                 activeTab.term.focus();
             }
         };
         btn.addEventListener('touchend', triggerAction, { passive: false });
         btn.addEventListener('click', triggerAction);
     });
-
-    // Intercept actual typing to apply the Ctrl/Alt modifiers
-    if (window.tabManager) {
-        const originalEmit = io.Socket.prototype.emit;
-        io.Socket.prototype.emit = function (eventName, payload) {
-            if (eventName === 'terminal:input' && (mobileCtrlActive || mobileAltActive) && payload.length === 1) {
-                const charLower = payload.toLowerCase();
-
-                // --- LOCAL APP SHORTCUTS (Ctrl + Alt) ---
-                if (mobileCtrlActive && mobileAltActive) {
-                    let shortcutTriggered = false;
-
-                    if (charLower === 't') { if (window.tabManager) window.tabManager.createTab(); shortcutTriggered = true; }
-                    else if (charLower === 'x') { if (window.tabManager && window.tabManager.activeTabId) window.tabManager.closeTab(window.tabManager.activeTabId); shortcutTriggered = true; }
-                    else if (charLower === 'g') { const btn = document.getElementById('grid-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'm') { const btn = document.getElementById('mouse-mode-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'l') { const btn = document.getElementById('theme-btn'); if (btn) btn.click(); shortcutTriggered = true; }
-                    else if (charLower === 'f') {
-                        const searchBar = document.getElementById('search-bar');
-                        const searchInput = document.getElementById('search-input');
-                        if (searchBar && searchInput) {
-                            searchBar.classList.remove('hidden');
-                            searchInput.focus();
-                            searchInput.select();
-                        }
-                        shortcutTriggered = true;
-                    }
-                    else if (payload === '[' || payload === ']') {
-                        const tabElements = Array.from(document.querySelectorAll('.tab'));
-                        const activeTabEl = document.querySelector('.tab.active');
-                        if (tabElements.length > 1 && activeTabEl) {
-                            const currentIndex = tabElements.indexOf(activeTabEl);
-                            const nextIndex = payload === '['
-                                ? (currentIndex - 1 + tabElements.length) % tabElements.length
-                                : (currentIndex + 1) % tabElements.length;
-                            tabElements[nextIndex].click();
-                        }
-                        shortcutTriggered = true;
-                    }
-                    if (shortcutTriggered) {
-                        mobileCtrlActive = false;
-                        mobileAltActive = false;
-                        mCtrlBtn.classList.remove('active-toggle');
-                        mAltBtn.classList.remove('active-toggle');
-                        return;
-                    }
-                }
-
-                // --- STANDARD TERMINAL MODIFIERS ---
-                let modifiedPayload = payload;
-                const charCode = payload.charCodeAt(0);
-                if (mobileCtrlActive) {
-                    if (charCode >= 97 && charCode <= 122) {
-                        modifiedPayload = String.fromCharCode(charCode - 96);
-                    }
-                    else if (charCode >= 65 && charCode <= 90) {
-                        modifiedPayload = String.fromCharCode(charCode - 64);
-                    }
-                    else if (payload === ' ') {
-                        modifiedPayload = '\x00';
-                    }
-                    mobileCtrlActive = false;
-                    mCtrlBtn.classList.remove('active-toggle');
-                }
-                if (mobileAltActive) {
-                    modifiedPayload = '\x1b' + modifiedPayload;
-                    mobileAltActive = false;
-                    mAltBtn.classList.remove('active-toggle');
-                }
-                return originalEmit.call(this, eventName, modifiedPayload);
-            }
-            return originalEmit.apply(this, arguments);
-        };
-    }
 });
 
 // --- Passkey, Download, and Telemetry Logic ---
@@ -1564,10 +1627,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
-                activeTab.socket.emit('terminal:input', '\r');
+                const fileList = Array.from(files, f => (f.name || 'unknown_file').replace(/[\x00-\x1f\x7f]/g, '')).join(', ');
+                activeTab.term.write(`\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
+                activeTab.sendInput('\r');
             } catch (err) {
                 activeTab.term.write(`\r\n\x1b[31m❌ Upload Error: ${err.message}\x1b[0m\r\n`);
-                activeTab.socket.emit('terminal:input', '\r');
+                activeTab.sendInput('\r');
             }
 
             // Clear the input so the same file can be uploaded again if needed
@@ -1747,7 +1812,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (secPassToggle) {
         secPassToggle.addEventListener('click', () => {
             if (!currentSettings || !currentSettings.hasEnvPassphrase) return;
-            updateSetting({ disablePassphrase: !currentSettings.disablePassphrase });
+            const nextDisable = !currentSettings.disablePassphrase;
+            if (nextDisable) cachedSessionPassphrase = null;
+            updateSetting({ disablePassphrase: nextDisable });
         });
     }
 

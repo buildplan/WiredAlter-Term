@@ -501,14 +501,6 @@ app.post('/upload', csrfCheck, upload.array('files'), (req, res) => {
     if (req.files.length === 0) {
         return res.status(400).json({ error: 'No files uploaded.' });
     }
-    const fileList = req.files
-        .map(f => {
-            return (f && typeof f.originalname === 'string')
-                ? f.originalname
-                : 'unknown_file';
-        })
-        .join(', ');
-    io.emit('terminal:output', `\r\n\x1b[32m✔ Uploaded to /data/uploads: ${fileList}\x1b[0m\r\n`);
     res.json({ success: true, count: req.files.length });
 });
 
@@ -712,6 +704,7 @@ io.on('connection', (socket) => {
     // Emit initial status so client knows if E2EE is required, available, and iterations
     socket.emit('e2ee:status', {
         forceE2EE: isEncryptedTab,
+        serverForceE2EE: effectiveForceE2EE,
         availableModes,
         iterations: E2EE_PBKDF2_ITERATIONS
     });
