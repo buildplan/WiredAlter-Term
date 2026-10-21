@@ -51,7 +51,7 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-COPY --from=docker:29.9.1-cli@sha256:6fae2214c3121a28d5aa639d09032f61310b7c9c75ffbad1025f261a1b621800 /usr/local/bin/docker /usr/local/bin/
+COPY --from=docker:29.9.2-cli@sha256:5a4ab11c9176a7d5b8d3ae23d47a248b0fb42d4f928dc183ce262bae11bdea65 /usr/local/bin/docker /usr/local/bin/
 
 # Install Starship
 # renovate: datasource=github-releases depName=starship/starship
