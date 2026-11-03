@@ -116,13 +116,17 @@ if [ -n "$NB_SETUP_KEY" ]; then
     UP_SUCCESS=false
 
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        NB_UP_OUT=$(netbird up --hostname="${NB_HOSTNAME}" $MANAGEMENT_ARG $EXTRA_FLAGS 2>&1)
-        if [ $? -eq 0 ]; then
+        NB_UP_OUT=$(timeout 20 netbird up --setup-key="${NB_SETUP_KEY}" --hostname="${NB_HOSTNAME}" $MANAGEMENT_ARG $EXTRA_FLAGS 2>&1)
+        NB_EXIT=$?
+        if [ $NB_EXIT -eq 0 ]; then
             UP_SUCCESS=true
             echo "$NB_UP_OUT"
             break
         else
             echo "$NB_UP_OUT"
+            if [ $NB_EXIT -eq 124 ]; then
+                echo "⚠️  NetBird connection timed out after 20s (management server unreachable or unresponsive)."
+            fi
             if echo "$NB_UP_OUT" | grep -qi "operation not permitted"; then
                 echo "❌ CRITICAL ERROR: NetBird was denied permission to create its network interface."
                 echo "   This means your container is missing required kernel capabilities."
@@ -143,6 +147,7 @@ if [ -n "$NB_SETUP_KEY" ]; then
         echo "✅ NetBird started. Hostname: $NB_HOSTNAME"
     else
         echo "❌ NetBird failed to start after $MAX_RETRIES attempts."
+        echo "⚠️  Continuing startup without NetBird to keep terminal available..."
     fi
 else
     echo "⚠️  NB_SETUP_KEY not found. Skipping NetBird start."
