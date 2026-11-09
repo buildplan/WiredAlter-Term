@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^14.0.0",
-    "@simplewebauthn/server": "^14.0.3",
+    "@simplewebauthn/server": "^14.1.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-serialize": "^0.14.0",
@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
-    "supertest": "^7.3.1",
+    "supertest": "^7.3.2",
     "terser": "^5.51.2"
   }
 }
