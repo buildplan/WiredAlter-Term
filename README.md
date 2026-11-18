@@ -158,6 +158,8 @@ To expose the terminal over NetBird instead of the public internet:
 
 3. Restart the container. The terminal will join your NetBird network as `wiredterm`.
 
+> **Note:** NetBird profile ownership (`NB_DISABLE_PROFILE_OWNERSHIP=true` and `NB_DISABLE_DEFAULT_PROFILE_CLAIM=true`) is disabled on the daemon by default, with the daemon Unix socket restricted to `root:node` (`0660`). This allows the `node` terminal user to run full `netbird status`, `netbird down`, and profile commands without `sudo`, while keeping root-only operations (such as `--allow-server-ssh`, `--enable-ssh-root`, and `--management-url`) restricted. Set `NB_DISABLE_PROFILE_OWNERSHIP=false` in `compose.yml` if you want to enforce profile ownership.
+
 ---
 
 ## System CLI
