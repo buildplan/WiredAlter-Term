@@ -96,6 +96,12 @@ services:
       # Defaults to the container hostname
       # - NB_HOSTNAME=my-custom-terminal
 
+      # [Optional] NetBird Profile Ownership (v0.83.0+)
+      # Defaults to 'true' (ownership disabled) with the daemon socket restricted
+      # to root and the 'node' group so 'netbird status' and connection commands
+      # work inside the terminal without sudo. Set to 'false' to enforce ownership.
+      # - NB_DISABLE_PROFILE_OWNERSHIP=true
+
     restart: unless-stopped
     depends_on:
       - docker-proxy

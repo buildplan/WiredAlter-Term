@@ -88,17 +88,46 @@ if [ -n "$NB_SETUP_KEY" ]; then
     # Allow overriding the config path, defaulting to official Docker expectation
     NETBIRD_CONFIG_PATH="${NB_CONFIG:-/var/lib/netbird/config.json}"
 
+    # Disable profile ownership by default
+    NB_DISABLE_PROFILE_OWNERSHIP_VAL="${NB_DISABLE_PROFILE_OWNERSHIP:-true}"
+    NB_DISABLE_DEFAULT_PROFILE_CLAIM_VAL="${NB_DISABLE_DEFAULT_PROFILE_CLAIM:-}"
+    if [ -z "$NB_DISABLE_DEFAULT_PROFILE_CLAIM_VAL" ] && [ "$NB_DISABLE_PROFILE_OWNERSHIP_VAL" = "true" ]; then
+        NB_DISABLE_DEFAULT_PROFILE_CLAIM_VAL="true"
+    fi
+
+    NB_SOCK_CUSTOM=""
+    case "${NB_DAEMON_ADDR:-}" in
+        unix://*) NB_SOCK_CUSTOM="${NB_DAEMON_ADDR#unix://}" ;;
+    esac
+
     unset NB_CONFIG
-    netbird service run --config "$NETBIRD_CONFIG_PATH" &
+    if [ -n "$NB_DISABLE_DEFAULT_PROFILE_CLAIM_VAL" ]; then
+        NB_DISABLE_PROFILE_OWNERSHIP="$NB_DISABLE_PROFILE_OWNERSHIP_VAL" \
+        NB_DISABLE_DEFAULT_PROFILE_CLAIM="$NB_DISABLE_DEFAULT_PROFILE_CLAIM_VAL" \
+        netbird service run --config "$NETBIRD_CONFIG_PATH" &
+    else
+        NB_DISABLE_PROFILE_OWNERSHIP="$NB_DISABLE_PROFILE_OWNERSHIP_VAL" \
+        netbird service run --config "$NETBIRD_CONFIG_PATH" &
+    fi
 
     echo "   ⏳ Waiting for NetBird daemon to initialize..."
-    for i in {1..15}; do
-        if [ -S "/var/run/netbird/netbird.sock" ]; then
+    NB_WAIT=0
+    while [ "$NB_WAIT" -lt 15 ]; do
+        if [ -S "/var/run/netbird.sock" ] || [ -S "/var/run/netbird/netbird.sock" ] || { [ -n "$NB_SOCK_CUSTOM" ] && [ -S "$NB_SOCK_CUSTOM" ]; }; then
             break
         fi
         sleep 1
+        NB_WAIT=$((NB_WAIT + 1))
     done
     sleep 2
+
+    # Restrict daemon Unix socket(s) to root:node (0660), matching --allow-group node
+    for NB_SOCK in /var/run/netbird.sock /var/run/netbird/netbird.sock /var/run/netbird-http.sock "$NB_SOCK_CUSTOM"; do
+        if [ -n "$NB_SOCK" ] && [ -S "$NB_SOCK" ]; then
+            chown root:node "$NB_SOCK"
+            chmod 0660 "$NB_SOCK"
+        fi
+    done
 
     NB_HOSTNAME="${NB_HOSTNAME:-$(hostname)}"
 
