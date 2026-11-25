@@ -52,6 +52,6 @@
   "devDependencies": {
     "esbuild": "^0.28.2",
     "supertest": "^7.3.2",
-    "terser": "^5.51.2"
+    "terser": "^5.51.4"
   }
 }
